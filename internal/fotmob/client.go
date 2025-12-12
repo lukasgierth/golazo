@@ -20,7 +20,7 @@ type Client struct {
 	baseURL    string
 }
 
-// NewClient creates a new FotMob API client
+// NewClient creates a new FotMob API client with default configuration.
 func NewClient() *Client {
 	return &Client{
 		httpClient: &http.Client{
@@ -30,8 +30,8 @@ func NewClient() *Client {
 	}
 }
 
-// GetMatchesByDate retrieves all matches for a specific date
-func (c *Client) GetMatchesByDate(ctx context.Context, date time.Time) ([]api.Match, error) {
+// MatchesByDate retrieves all matches for a specific date.
+func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match, error) {
 	dateStr := date.Format("20060102")
 	url := fmt.Sprintf("%s/matches?date=%s", c.baseURL, dateStr)
 
@@ -68,8 +68,8 @@ func (c *Client) GetMatchesByDate(ctx context.Context, date time.Time) ([]api.Ma
 	return matches, nil
 }
 
-// GetMatchDetails retrieves detailed information about a specific match
-func (c *Client) GetMatchDetails(ctx context.Context, matchID int) (*api.MatchDetails, error) {
+// MatchDetails retrieves detailed information about a specific match.
+func (c *Client) MatchDetails(ctx context.Context, matchID int) (*api.MatchDetails, error) {
 	url := fmt.Sprintf("%s/matchDetails?matchId=%d", c.baseURL, matchID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -98,24 +98,24 @@ func (c *Client) GetMatchDetails(ctx context.Context, matchID int) (*api.MatchDe
 	return response.toAPIMatchDetails(), nil
 }
 
-// GetLeagues retrieves available leagues
-func (c *Client) GetLeagues(ctx context.Context) ([]api.League, error) {
+// Leagues retrieves available leagues.
+func (c *Client) Leagues(ctx context.Context) ([]api.League, error) {
 	// FotMob doesn't have a direct leagues endpoint, so we'll return an empty slice
 	// In a real implementation, you might need to maintain a list of known leagues
 	// or fetch them from a different endpoint
 	return []api.League{}, nil
 }
 
-// GetLeagueMatches retrieves matches for a specific league
-func (c *Client) GetLeagueMatches(ctx context.Context, leagueID int) ([]api.Match, error) {
+// LeagueMatches retrieves matches for a specific league.
+func (c *Client) LeagueMatches(ctx context.Context, leagueID int) ([]api.Match, error) {
 	// This would require a different endpoint structure
 	// For now, we'll return an empty slice
 	// In a real implementation, you'd use: /api/leagues?id={leagueID}
 	return []api.Match{}, nil
 }
 
-// GetLeagueTable retrieves the league table/standings for a specific league
-func (c *Client) GetLeagueTable(ctx context.Context, leagueID int) ([]api.LeagueTableEntry, error) {
+// LeagueTable retrieves the league table/standings for a specific league.
+func (c *Client) LeagueTable(ctx context.Context, leagueID int) ([]api.LeagueTableEntry, error) {
 	url := fmt.Sprintf("%s/leagues?id=%d", c.baseURL, leagueID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -152,4 +152,3 @@ func (c *Client) GetLeagueTable(ctx context.Context, leagueID int) ([]api.League
 
 	return entries, nil
 }
-

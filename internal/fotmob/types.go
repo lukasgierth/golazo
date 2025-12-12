@@ -9,12 +9,12 @@ import (
 
 // fotmobMatch represents a match in FotMob's API format
 type fotmobMatch struct {
-	ID      int    `json:"id"`
-	Round   string `json:"round"`
-	Home    team   `json:"home"`
-	Away    team   `json:"away"`
-	Status  status `json:"status"`
-	League  league `json:"league"`
+	ID     int    `json:"id"`
+	Round  string `json:"round"`
+	Home   team   `json:"home"`
+	Away   team   `json:"away"`
+	Status status `json:"status"`
+	League league `json:"league"`
 }
 
 type team struct {
@@ -31,10 +31,10 @@ type league struct {
 }
 
 type status struct {
-	UTCTime  string `json:"utcTime"`
-	Started  bool   `json:"started"`
-	Finished bool   `json:"finished"`
-	Cancelled bool  `json:"cancelled"`
+	UTCTime   string    `json:"utcTime"`
+	Started   bool      `json:"started"`
+	Finished  bool      `json:"finished"`
+	Cancelled bool      `json:"cancelled"`
 	LiveTime  *liveTime `json:"liveTime,omitempty"`
 	Score     *score    `json:"score,omitempty"`
 }
@@ -103,13 +103,13 @@ func (m fotmobMatch) toAPIMatch() api.Match {
 
 // fotmobMatchDetails represents detailed match information from FotMob
 type fotmobMatchDetails struct {
-	ID      int    `json:"id"`
-	Round   string `json:"round"`
-	Home    team   `json:"home"`
-	Away    team   `json:"away"`
-	Status  status `json:"status"`
-	League  league `json:"league"`
-	Events  []event `json:"events"`
+	ID     int     `json:"id"`
+	Round  string  `json:"round"`
+	Home   team    `json:"home"`
+	Away   team    `json:"away"`
+	Status status  `json:"status"`
+	League league  `json:"league"`
+	Events []event `json:"events"`
 }
 
 type event struct {
@@ -134,7 +134,7 @@ func (m fotmobMatchDetails) toAPIMatchDetails() *api.MatchDetails {
 	}.toAPIMatch()
 
 	details := &api.MatchDetails{
-		Match: baseMatch,
+		Match:  baseMatch,
 		Events: make([]api.MatchEvent, 0, len(m.Events)),
 	}
 
@@ -187,20 +187,20 @@ type fotmobTableRow struct {
 // toAPITableEntry converts fotmobTableRow to api.LeagueTableEntry
 func (r fotmobTableRow) toAPITableEntry() api.LeagueTableEntry {
 	return api.LeagueTableEntry{
-		Position:      r.Rank,
+		Position: r.Rank,
 		Team: api.Team{
 			ID:        r.ID,
 			Name:      r.Name,
 			ShortName: r.ShortName,
 		},
-		Played:        r.Played,
-		Won:           r.Wins,
-		Drawn:         r.Draws,
-		Lost:          r.Losses,
-		GoalsFor:      r.GoalsFor,
-		GoalsAgainst:  r.GoalsAgainst,
+		Played:         r.Played,
+		Won:            r.Wins,
+		Drawn:          r.Draws,
+		Lost:           r.Losses,
+		GoalsFor:       r.GoalsFor,
+		GoalsAgainst:   r.GoalsAgainst,
 		GoalDifference: r.GoalDifference,
-		Points:        r.Points,
+		Points:         r.Points,
 	}
 }
 
@@ -231,4 +231,3 @@ func parseInt(s string) *int {
 	}
 	return &val
 }
-
