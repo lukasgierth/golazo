@@ -4,6 +4,7 @@ package ui
 import (
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -45,7 +46,10 @@ var (
 // RenderMainMenu renders the main menu view with navigation options.
 // width and height specify the terminal dimensions.
 // selected indicates which menu item is currently selected (0-indexed).
-func RenderMainMenu(width, height, selected int) string {
+// sp is the spinner model to display when loading (for other views).
+// randomSpinner is the random character spinner for main view.
+// loading indicates if the spinner should be shown.
+func RenderMainMenu(width, height, selected int, sp spinner.Model, randomSpinner *RandomCharSpinner, loading bool) string {
 	menuItems := []string{
 		"Stats",
 		"Live Matches",
@@ -62,13 +66,31 @@ func RenderMainMenu(width, height, selected int) string {
 
 	menuContent := strings.Join(items, "\n")
 
-	title := menuTitleStyle.Render("⚽ Golazo")
+	title := menuTitleStyle.Render("GOLAZO")
 	help := menuHelpStyle.Render("↑/↓: navigate  Enter: select  q: quit")
+
+	// Spinner with fixed spacing - always reserve space to prevent movement
+	// Use multiple spinner instances for a longer, more prominent animation
+	spinnerStyle := lipgloss.NewStyle().
+		Align(lipgloss.Center).
+		Height(1).
+		Padding(0, 0)
+
+	var spinnerContent string
+	if loading && randomSpinner != nil {
+		// Use random character spinner for main view
+		spinnerContent = spinnerStyle.Render(randomSpinner.View())
+	} else {
+		// Reserve space even when not loading to prevent menu movement
+		spinnerContent = spinnerStyle.Render("")
+	}
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Center,
 		title,
-		strings.Repeat("\n", 2),
+		strings.Repeat("\n", 1),
+		spinnerContent,
+		strings.Repeat("\n", 1),
 		menuContent,
 		strings.Repeat("\n", 2),
 		help,

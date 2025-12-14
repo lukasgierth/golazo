@@ -32,7 +32,9 @@ type model struct {
 	matchDetails       *api.MatchDetails
 	liveUpdates        []string
 	spinner            spinner.Model
+	randomSpinner      *ui.RandomCharSpinner
 	loading            bool
+	mainViewLoading    bool
 	fotmobClient       *fotmob.Client
 	footballDataClient *footballdata.Client
 	parser             *fotmob.LiveUpdateParser
@@ -45,8 +47,12 @@ type model struct {
 // NewModel creates a new application model with default values.
 func NewModel() model {
 	s := spinner.New()
-	s.Spinner = spinner.Dot
+	s.Spinner = spinner.Line // More prominent spinner animation
 	s.Style = ui.SpinnerStyle()
+
+	// Initialize random character spinner for main view
+	randomSpinner := ui.NewRandomCharSpinner()
+	randomSpinner.SetWidth(30) // Wider spinner for more characters
 
 	// Initialize Football-Data.org client if API key is available
 	var footballDataClient *footballdata.Client
@@ -71,6 +77,7 @@ func NewModel() model {
 		currentView:        viewMain,
 		selected:           0,
 		spinner:            s,
+		randomSpinner:      randomSpinner,
 		liveUpdates:        []string{},
 		fotmobClient:       fotmob.NewClient(),
 		footballDataClient: footballDataClient,
@@ -82,7 +89,7 @@ func NewModel() model {
 }
 
 func (m model) Init() tea.Cmd {
-	return m.spinner.Tick
+	return tea.Batch(m.spinner.Tick, m.randomSpinner.Init())
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -96,7 +103,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// List sizes will be updated in View() method
 		return m, nil
 	case spinner.TickMsg:
-		if m.loading {
+		if m.loading || m.mainViewLoading {
 			m.spinner, cmd = m.spinner.Update(msg)
 			cmds = append(cmds, cmd)
 		}
@@ -258,33 +265,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return m, nil
-	}
-	return m, nil
-}
-
-func (m model) handleMainViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "j", "down":
-		if m.selected < 1 {
-			m.selected++
+	case ui.TickMsg:
+		// Handle random spinner tick
+		if m.mainViewLoading {
+			var cmd tea.Cmd
+			var model tea.Model
+			model, cmd = m.randomSpinner.Update(msg)
+			if spinner, ok := model.(*ui.RandomCharSpinner); ok {
+				m.randomSpinner = spinner
+			}
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
-		return m, nil
-	case "k", "up":
-		if m.selected > 0 {
-			m.selected--
-		}
-		return m, nil
-	case "enter":
-		if m.selected == 0 {
-			// Stats - navigate to stats view
-			// Clear any previous view state
-			m.matches = []ui.MatchDisplay{}
-			m.matchDetails = nil
-			m.liveUpdates = []string{}
-			m.lastEvents = []api.MatchEvent{}
-			m.polling = false
-			m.selected = 0
+		return m, tea.Batch(cmds...)
+	case mainViewCheckMsg:
+		// Check completed, navigate to selected view
+		m.mainViewLoading = false
 
+		// Clear any previous view state
+		m.matches = []ui.MatchDisplay{}
+		m.matchDetails = nil
+		m.liveUpdates = []string{}
+		m.lastEvents = []api.MatchEvent{}
+		m.polling = false
+		m.selected = 0
+
+		if msg.selection == 0 {
+			// Stats view
 			if m.footballDataClient == nil {
 				// No API key configured, show empty state
 				m.currentView = viewStats
@@ -294,19 +302,41 @@ func (m model) handleMainViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.currentView = viewStats
 			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, fetchFinishedMatches(m.footballDataClient))
-		} else if m.selected == 1 {
-			// Live Matches - fetch live matches from API
-			// Clear any previous view state
-			m.matches = []ui.MatchDisplay{}
-			m.matchDetails = nil
-			m.liveUpdates = []string{}
-			m.lastEvents = []api.MatchEvent{}
-			m.polling = false
-			m.selected = 0
-
+		} else if msg.selection == 1 {
+			// Live Matches view
 			m.currentView = viewLiveMatches
 			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, fetchLiveMatches(m.fotmobClient))
+		}
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m model) handleMainViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "j", "down":
+		if m.selected < 1 && !m.mainViewLoading {
+			m.selected++
+		}
+		return m, nil
+	case "k", "up":
+		if m.selected > 0 && !m.mainViewLoading {
+			m.selected--
+		}
+		return m, nil
+	case "enter":
+		if m.mainViewLoading {
+			return m, nil // Ignore enter while loading
+		}
+		if m.selected == 0 {
+			// Stats - start loading check
+			m.mainViewLoading = true
+			return m, tea.Batch(m.spinner.Tick, performMainViewCheck(0))
+		} else if m.selected == 1 {
+			// Live Matches - start loading check
+			m.mainViewLoading = true
+			return m, tea.Batch(m.spinner.Tick, performMainViewCheck(1))
 		}
 		return m, nil
 	}
@@ -378,13 +408,13 @@ func (m model) loadStatsMatchDetails(matchID int) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	switch m.currentView {
 	case viewMain:
-		return ui.RenderMainMenu(m.width, m.height, m.selected)
+		return ui.RenderMainMenu(m.width, m.height, m.selected, m.spinner, m.randomSpinner, m.mainViewLoading)
 	case viewLiveMatches:
 		return ui.RenderMultiPanelViewWithList(m.width, m.height, m.liveMatchesList, m.matchDetails, m.liveUpdates, m.spinner, m.loading)
 	case viewStats:
 		return ui.RenderStatsViewWithList(m.width, m.height, m.statsMatchesList, m.matchDetails)
 	default:
-		return ui.RenderMainMenu(m.width, m.height, m.selected)
+		return ui.RenderMainMenu(m.width, m.height, m.selected, m.spinner, m.randomSpinner, m.mainViewLoading)
 	}
 }
 
