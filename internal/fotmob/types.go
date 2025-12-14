@@ -3,6 +3,7 @@ package fotmob
 import (
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/0xjuanma/golazo/internal/api"
@@ -116,85 +117,140 @@ func (m fotmobMatch) toAPIMatch() api.Match {
 }
 
 // fotmobMatchDetails represents detailed match information from FotMob
+// Note: FotMob API returns a nested structure with content.matchFacts containing events
 type fotmobMatchDetails struct {
-	ID     string  `json:"id"` // FotMob returns string IDs
-	Round  string  `json:"round"`
-	Home   team    `json:"home"`
-	Away   team    `json:"away"`
-	Status status  `json:"status"`
-	League league  `json:"league"`
-	Events []event `json:"events"`
+	Header struct {
+		Teams []struct {
+			ID    int    `json:"id"`
+			Name  string `json:"name"`
+			Score int    `json:"score"`
+		} `json:"teams"`
+		Status status `json:"status"`
+	} `json:"header"`
+	General struct {
+		ID     string `json:"id"`
+		Round  string `json:"round"`
+		Home   team   `json:"home"`
+		Away   team   `json:"away"`
+		League league `json:"league"`
+	} `json:"general"`
+	Content struct {
+		MatchFacts struct {
+			Events []fotmobEventDetail `json:"events"`
+		} `json:"matchFacts"`
+	} `json:"content"`
 }
 
-type event struct {
-	ID        int    `json:"id"`
-	Minute    int    `json:"minute"`
-	Type      string `json:"type"`
-	TeamID    string `json:"teamId"` // FotMob returns teamId as string
-	Player    string `json:"player,omitempty"`
-	Assist    string `json:"assist,omitempty"`
-	EventType string `json:"eventType,omitempty"`
+// fotmobEventDetail represents a single event detail from FotMob
+type fotmobEventDetail struct {
+	Time    int    `json:"time"`
+	TimeStr int    `json:"timeStr"`
+	Type    string `json:"type"`
+	EventID int    `json:"eventId"`
+	IsHome  bool   `json:"isHome"`
+	Player  *struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"player,omitempty"`
+	PlayerID  *int   `json:"playerId,omitempty"`
+	NameStr   string `json:"nameStr,omitempty"`
+	FirstName string `json:"firstName,omitempty"`
+	LastName  string `json:"lastName,omitempty"`
+	FullName  string `json:"fullName,omitempty"`
+	HomeScore int    `json:"homeScore"`
+	AwayScore int    `json:"awayScore"`
+	NewScore  []int  `json:"newScore,omitempty"`
+	OwnGoal   *bool  `json:"ownGoal,omitempty"`
+	IsPenalty *bool  `json:"isPenalty,omitempty"`
+	Card      string `json:"card,omitempty"` // "Yellow" or "Red"
+	Swap      []struct {
+		Name string `json:"name"`
+		ID   string `json:"id"`
+	} `json:"swap,omitempty"` // For substitutions
+	AssistStr      string `json:"assistStr,omitempty"`
+	AssistInput    string `json:"assistInput,omitempty"`
+	AssistPlayerID *int   `json:"assistPlayerId,omitempty"`
 }
 
 // toAPIMatchDetails converts fotmobMatchDetails to api.MatchDetails
 func (m fotmobMatchDetails) toAPIMatchDetails() *api.MatchDetails {
+	// Extract match info from general and header
 	baseMatch := fotmobMatch{
-		ID:     m.ID,
-		Round:  m.Round,
-		Home:   m.Home,
-		Away:   m.Away,
-		Status: m.Status,
-		League: m.League,
+		ID:     m.General.ID,
+		Round:  m.General.Round,
+		Home:   m.General.Home,
+		Away:   m.General.Away,
+		Status: m.Header.Status,
+		League: m.General.League,
 	}.toAPIMatch()
 
 	details := &api.MatchDetails{
 		Match:  baseMatch,
-		Events: make([]api.MatchEvent, 0, len(m.Events)),
+		Events: make([]api.MatchEvent, 0),
 	}
 
-	// Convert events and sort by minute for chronological order
-	events := make([]api.MatchEvent, 0, len(m.Events))
-	for _, e := range m.Events {
+	// Convert events from content.matchFacts.events
+	events := make([]api.MatchEvent, 0, len(m.Content.MatchFacts.Events))
+	for _, e := range m.Content.MatchFacts.Events {
+		// Skip non-event types like "Half"
+		if e.Type == "Half" {
+			continue
+		}
+
+		// Normalize event type to lowercase for consistent matching
+		eventType := strings.ToLower(e.Type)
+
 		event := api.MatchEvent{
-			ID:        e.ID,
-			Minute:    e.Minute,
-			Type:      e.Type,
-			Timestamp: time.Now(), // FotMob doesn't always provide timestamp
+			ID:        e.EventID,
+			Minute:    e.Time,
+			Type:      eventType,
+			Timestamp: time.Now(),
 		}
 
-		if e.Player != "" {
-			event.Player = &e.Player
+		// Extract player name
+		playerName := ""
+		if e.Player != nil && e.Player.Name != "" {
+			playerName = e.Player.Name
+		} else if e.FullName != "" {
+			playerName = e.FullName
+		} else if e.NameStr != "" {
+			playerName = e.NameStr
 		}
-		if e.Assist != "" {
-			event.Assist = &e.Assist
-		}
-		if e.EventType != "" {
-			event.EventType = &e.EventType
+		if playerName != "" {
+			event.Player = &playerName
 		}
 
-		// Set team based on teamId - match with home or away team
-		// Convert team IDs to int for comparison
-		homeIDInt := parseInt(m.Home.ID)
-		awayIDInt := parseInt(m.Away.ID)
-		eventTeamIDInt := parseInt(e.TeamID)
+		// Extract assist
+		if e.AssistInput != "" {
+			event.Assist = &e.AssistInput
+		}
 
-		switch eventTeamIDInt {
-		case homeIDInt:
+		// Extract event type details
+		eventTypeDetail := ""
+		if e.Type == "Card" && e.Card != "" {
+			eventTypeDetail = strings.ToLower(e.Card)
+		} else if e.Type == "Substitution" && len(e.Swap) >= 2 {
+			// Substitution: swap[0] is out, swap[1] is in
+			eventTypeDetail = "out"
+		}
+		if eventTypeDetail != "" {
+			event.EventType = &eventTypeDetail
+		}
+
+		// Set team based on isHome flag
+		homeIDInt := parseInt(m.General.Home.ID)
+		awayIDInt := parseInt(m.General.Away.ID)
+		if e.IsHome {
 			event.Team = api.Team{
 				ID:        homeIDInt,
-				Name:      m.Home.Name,
-				ShortName: m.Home.ShortName,
+				Name:      m.General.Home.Name,
+				ShortName: m.General.Home.ShortName,
 			}
-		case awayIDInt:
+		} else {
 			event.Team = api.Team{
 				ID:        awayIDInt,
-				Name:      m.Away.Name,
-				ShortName: m.Away.ShortName,
-			}
-		default:
-			// Fallback if team ID doesn't match
-			event.Team = api.Team{
-				ID: eventTeamIDInt,
+				Name:      m.General.Away.Name,
+				ShortName: m.General.Away.ShortName,
 			}
 		}
 
