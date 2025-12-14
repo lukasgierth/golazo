@@ -3,6 +3,7 @@ package app
 import (
 	"time"
 
+	"github.com/0xjuanma/golazo/internal/constants"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -11,9 +12,9 @@ type mainViewCheckMsg struct {
 	selection int // 0 for Stats, 1 for Live Matches
 }
 
-// performMainViewCheck performs a 3-second delay check before navigating.
+// performMainViewCheck performs a delay check before navigating.
 func performMainViewCheck(selection int) tea.Cmd {
-	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+	return tea.Tick(constants.MainViewCheckDelay, func(t time.Time) tea.Msg {
 		return mainViewCheckMsg{selection: selection}
 	})
 }
