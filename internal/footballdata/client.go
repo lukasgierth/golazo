@@ -12,19 +12,18 @@ import (
 )
 
 const (
-	baseURL      = "https://api-football-v1.p.rapidapi.com/v3"
-	rapidAPIHost = "api-football-v1.p.rapidapi.com"
+	baseURL = "https://v3.football.api-sports.io"
 )
 
-// Client implements the api.Client interface for API-Football.com (RapidAPI)
+// Client implements the api.Client interface for API-Sports.io (free tier)
 type Client struct {
 	httpClient *http.Client
 	baseURL    string
 	apiKey     string
 }
 
-// NewClient creates a new API-Football.com client.
-// apiKey is required for authentication (get one at https://www.api-football.com/)
+// NewClient creates a new API-Sports.io client.
+// apiKey is required for authentication (get one at https://www.api-sports.io/)
 func NewClient(apiKey string) *Client {
 	return &Client{
 		httpClient: &http.Client{
@@ -41,7 +40,7 @@ func (c *Client) FinishedMatchesByDateRange(ctx context.Context, dateFrom, dateT
 	dateFromStr := dateFrom.Format("2006-01-02")
 	dateToStr := dateTo.Format("2006-01-02")
 
-	// API-Football.com uses /fixtures endpoint with date range
+	// API-Sports.io uses /fixtures endpoint with date range
 	// Use 'from' and 'to' parameters for date range, and filter for finished matches (status=FT)
 	url := fmt.Sprintf("%s/fixtures?from=%s&to=%s&status=FT", c.baseURL, dateFromStr, dateToStr)
 
@@ -50,8 +49,7 @@ func (c *Client) FinishedMatchesByDateRange(ctx context.Context, dateFrom, dateT
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-RapidAPI-Key", c.apiKey)
-	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
+	req.Header.Set("x-apisports-key", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -111,8 +109,7 @@ func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-RapidAPI-Key", c.apiKey)
-	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
+	req.Header.Set("x-apisports-key", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -153,8 +150,7 @@ func (c *Client) MatchDetails(ctx context.Context, matchID int) (*api.MatchDetai
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-RapidAPI-Key", c.apiKey)
-	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
+	req.Header.Set("x-apisports-key", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -211,8 +207,7 @@ func (c *Client) LeagueMatches(ctx context.Context, leagueID int) ([]api.Match, 
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-RapidAPI-Key", c.apiKey)
-	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
+	req.Header.Set("x-apisports-key", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -253,8 +248,7 @@ func (c *Client) LeagueTable(ctx context.Context, leagueID int) ([]api.LeagueTab
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-RapidAPI-Key", c.apiKey)
-	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
+	req.Header.Set("x-apisports-key", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

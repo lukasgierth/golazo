@@ -24,37 +24,35 @@ func main() {
 	fmt.Printf("✓ API key found (length: %d)\n\n", len(apiKey))
 
 	// Test the API endpoint directly
-	baseURL := "https://api-football-v1.p.rapidapi.com/v3"
-	rapidAPIHost := "api-football-v1.p.rapidapi.com"
+	baseURL := "https://v3.football.api-sports.io"
 
 	// Test 1: Get fixtures for today
 	fmt.Println("Test 1: Fetching fixtures for today...")
 	today := time.Now().Format("2006-01-02")
 	url1 := fmt.Sprintf("%s/fixtures?date=%s", baseURL, today)
-	testEndpoint(url1, apiKey, rapidAPIHost)
+	testEndpoint(url1, apiKey)
 
 	// Test 2: Get fixtures with date range (last 7 days)
 	fmt.Println("\nTest 2: Fetching fixtures from last 7 days...")
 	dateFrom := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
 	dateTo := time.Now().Format("2006-01-02")
 	url2 := fmt.Sprintf("%s/fixtures?from=%s&to=%s", baseURL, dateFrom, dateTo)
-	testEndpoint(url2, apiKey, rapidAPIHost)
+	testEndpoint(url2, apiKey)
 
 	// Test 3: Get finished matches only
 	fmt.Println("\nTest 3: Fetching finished matches from last 7 days...")
 	url3 := fmt.Sprintf("%s/fixtures?from=%s&to=%s&status=FT", baseURL, dateFrom, dateTo)
-	testEndpoint(url3, apiKey, rapidAPIHost)
+	testEndpoint(url3, apiKey)
 }
 
-func testEndpoint(url string, apiKey, host string) {
+func testEndpoint(url string, apiKey string) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		fmt.Printf("  ❌ Failed to create request: %v\n", err)
 		return
 	}
 
-	req.Header.Set("X-RapidAPI-Key", apiKey)
-	req.Header.Set("X-RapidAPI-Host", host)
+	req.Header.Set("x-apisports-key", apiKey)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)

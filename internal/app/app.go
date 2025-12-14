@@ -56,7 +56,7 @@ func NewModel(useMockData bool) model {
 	randomSpinner := ui.NewRandomCharSpinner()
 	randomSpinner.SetWidth(30) // Wider spinner for more characters
 
-	// Initialize Football-Data.org client if API key is available
+	// Initialize API-Sports.io client if API key is available
 	var footballDataClient *footballdata.Client
 	if apiKey, err := data.FootballDataAPIKey(); err == nil {
 		footballDataClient = footballdata.NewClient(apiKey)
@@ -519,7 +519,7 @@ type finishedMatchesMsg struct {
 	matches []api.Match
 }
 
-// fetchFinishedMatches fetches finished matches from the Football-Data.org API.
+// fetchFinishedMatches fetches finished matches from the API-Sports.io API.
 // If useMockData is true, always uses mock data.
 // If useMockData is false, uses real API data (no fallback to mock data).
 func fetchFinishedMatches(client *footballdata.Client, useMockData bool) tea.Cmd {
