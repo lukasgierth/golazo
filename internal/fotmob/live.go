@@ -191,9 +191,9 @@ func (p *LiveUpdateParser) formatEvent(event api.MatchEvent, homeTeam, awayTeam 
 	}
 }
 
-// GetNewEvents compares two event lists and returns only new events.
+// NewEvents compares two event lists and returns only new events.
 // This is useful for detecting new updates when polling match details.
-func (p *LiveUpdateParser) GetNewEvents(oldEvents, newEvents []api.MatchEvent) []api.MatchEvent {
+func (p *LiveUpdateParser) NewEvents(oldEvents, newEvents []api.MatchEvent) []api.MatchEvent {
 	// Create a map of old event IDs for quick lookup
 	oldEventMap := make(map[int]bool)
 	for _, event := range oldEvents {
