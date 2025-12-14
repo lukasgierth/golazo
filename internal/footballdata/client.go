@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -11,18 +12,19 @@ import (
 )
 
 const (
-	baseURL = "https://api.football-data.org/v4"
+	baseURL      = "https://api-football-v1.p.rapidapi.com/v3"
+	rapidAPIHost = "api-football-v1.p.rapidapi.com"
 )
 
-// Client implements the api.Client interface for Football-Data.org API
+// Client implements the api.Client interface for API-Football.com (RapidAPI)
 type Client struct {
 	httpClient *http.Client
 	baseURL    string
 	apiKey     string
 }
 
-// NewClient creates a new Football-Data.org API client.
-// apiKey is required for authentication (get one at https://www.football-data.org/)
+// NewClient creates a new API-Football.com client.
+// apiKey is required for authentication (get one at https://www.api-football.com/)
 func NewClient(apiKey string) *Client {
 	return &Client{
 		httpClient: &http.Client{
@@ -39,15 +41,17 @@ func (c *Client) FinishedMatchesByDateRange(ctx context.Context, dateFrom, dateT
 	dateFromStr := dateFrom.Format("2006-01-02")
 	dateToStr := dateTo.Format("2006-01-02")
 
-	url := fmt.Sprintf("%s/matches?dateFrom=%s&dateTo=%s&status=FINISHED", c.baseURL, dateFromStr, dateToStr)
+	// API-Football.com uses /fixtures endpoint with date range
+	// Fetch all matches in date range, then filter for finished ones
+	url := fmt.Sprintf("%s/fixtures?date=%s&to=%s", c.baseURL, dateFromStr, dateToStr)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-Auth-Token", c.apiKey)
-	req.Header.Set("User-Agent", "golazo/1.0")
+	req.Header.Set("X-RapidAPI-Key", c.apiKey)
+	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -56,7 +60,13 @@ func (c *Client) FinishedMatchesByDateRange(ctx context.Context, dateFrom, dateT
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		// Read error response body for better error messages
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyStr := string(bodyBytes)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200]
+		}
+		return nil, fmt.Errorf("unexpected status code: %d, response: %s", resp.StatusCode, bodyStr)
 	}
 
 	var response footballdataMatchesResponse
@@ -64,8 +74,8 @@ func (c *Client) FinishedMatchesByDateRange(ctx context.Context, dateFrom, dateT
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	matches := make([]api.Match, 0, len(response.Matches))
-	for _, m := range response.Matches {
+	matches := make([]api.Match, 0, len(response.Response))
+	for _, m := range response.Response {
 		matches = append(matches, m.toAPIMatch())
 	}
 
@@ -89,15 +99,15 @@ func (c *Client) RecentFinishedMatches(ctx context.Context, days int) ([]api.Mat
 // Implements api.Client interface.
 func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match, error) {
 	dateStr := date.Format("2006-01-02")
-	url := fmt.Sprintf("%s/matches?dateFrom=%s&dateTo=%s", c.baseURL, dateStr, dateStr)
+	url := fmt.Sprintf("%s/fixtures?date=%s", c.baseURL, dateStr)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-Auth-Token", c.apiKey)
-	req.Header.Set("User-Agent", "golazo/1.0")
+	req.Header.Set("X-RapidAPI-Key", c.apiKey)
+	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -106,7 +116,13 @@ func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		// Read error response body for better error messages
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyStr := string(bodyBytes)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200]
+		}
+		return nil, fmt.Errorf("unexpected status code: %d, response: %s", resp.StatusCode, bodyStr)
 	}
 
 	var response footballdataMatchesResponse
@@ -114,8 +130,8 @@ func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	matches := make([]api.Match, 0, len(response.Matches))
-	for _, m := range response.Matches {
+	matches := make([]api.Match, 0, len(response.Response))
+	for _, m := range response.Response {
 		matches = append(matches, m.toAPIMatch())
 	}
 
@@ -125,15 +141,15 @@ func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match
 // MatchDetails retrieves detailed information about a specific match.
 // Implements api.Client interface.
 func (c *Client) MatchDetails(ctx context.Context, matchID int) (*api.MatchDetails, error) {
-	url := fmt.Sprintf("%s/matches/%d", c.baseURL, matchID)
+	url := fmt.Sprintf("%s/fixtures?id=%d", c.baseURL, matchID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-Auth-Token", c.apiKey)
-	req.Header.Set("User-Agent", "golazo/1.0")
+	req.Header.Set("X-RapidAPI-Key", c.apiKey)
+	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -142,18 +158,31 @@ func (c *Client) MatchDetails(ctx context.Context, matchID int) (*api.MatchDetai
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		// Read error response body for better error messages
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyStr := string(bodyBytes)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200]
+		}
+		return nil, fmt.Errorf("unexpected status code: %d, response: %s", resp.StatusCode, bodyStr)
 	}
 
-	var match footballdataMatchDetails
-	if err := json.NewDecoder(resp.Body).Decode(&match); err != nil {
+	var response struct {
+		Response []footballdataMatch `json:"response"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	baseMatch := match.footballdataMatch.toAPIMatch()
+	if len(response.Response) == 0 {
+		return nil, fmt.Errorf("match not found")
+	}
+
+	match := response.Response[0]
+	baseMatch := match.toAPIMatch()
 	details := &api.MatchDetails{
 		Match:  baseMatch,
-		Events: []api.MatchEvent{}, // Football-Data.org doesn't provide events in basic match details
+		Events: []api.MatchEvent{}, // Events would need separate endpoint call
 	}
 
 	return details, nil
@@ -170,15 +199,15 @@ func (c *Client) Leagues(ctx context.Context) ([]api.League, error) {
 // LeagueMatches retrieves matches for a specific league.
 // Implements api.Client interface.
 func (c *Client) LeagueMatches(ctx context.Context, leagueID int) ([]api.Match, error) {
-	url := fmt.Sprintf("%s/competitions/%d/matches", c.baseURL, leagueID)
+	url := fmt.Sprintf("%s/fixtures?league=%d", c.baseURL, leagueID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-Auth-Token", c.apiKey)
-	req.Header.Set("User-Agent", "golazo/1.0")
+	req.Header.Set("X-RapidAPI-Key", c.apiKey)
+	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -187,19 +216,22 @@ func (c *Client) LeagueMatches(ctx context.Context, leagueID int) ([]api.Match, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		// Read error response body for better error messages
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyStr := string(bodyBytes)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200]
+		}
+		return nil, fmt.Errorf("unexpected status code: %d, response: %s", resp.StatusCode, bodyStr)
 	}
 
-	var response struct {
-		Matches []footballdataMatch `json:"matches"`
-	}
-
+	var response footballdataMatchesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	matches := make([]api.Match, 0, len(response.Matches))
-	for _, m := range response.Matches {
+	matches := make([]api.Match, 0, len(response.Response))
+	for _, m := range response.Response {
 		matches = append(matches, m.toAPIMatch())
 	}
 
@@ -209,15 +241,15 @@ func (c *Client) LeagueMatches(ctx context.Context, leagueID int) ([]api.Match, 
 // LeagueTable retrieves the league table/standings for a specific league.
 // Implements api.Client interface.
 func (c *Client) LeagueTable(ctx context.Context, leagueID int) ([]api.LeagueTableEntry, error) {
-	url := fmt.Sprintf("%s/competitions/%d/standings", c.baseURL, leagueID)
+	url := fmt.Sprintf("%s/standings?league=%d&season=2024", c.baseURL, leagueID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-Auth-Token", c.apiKey)
-	req.Header.Set("User-Agent", "golazo/1.0")
+	req.Header.Set("X-RapidAPI-Key", c.apiKey)
+	req.Header.Set("X-RapidAPI-Host", rapidAPIHost)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -226,56 +258,66 @@ func (c *Client) LeagueTable(ctx context.Context, leagueID int) ([]api.LeagueTab
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		// Read error response body for better error messages
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyStr := string(bodyBytes)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200]
+		}
+		return nil, fmt.Errorf("unexpected status code: %d, response: %s", resp.StatusCode, bodyStr)
 	}
 
 	var response struct {
-		Standings []struct {
-			Table []struct {
-				Position int `json:"position"`
-				Team     struct {
-					ID        int    `json:"id"`
-					Name      string `json:"name"`
-					ShortName string `json:"shortName"`
-					Crest     string `json:"crest,omitempty"`
-				} `json:"team"`
-				PlayedGames    int `json:"playedGames"`
-				Won            int `json:"won"`
-				Draw           int `json:"draw"`
-				Lost           int `json:"lost"`
-				GoalsFor       int `json:"goalsFor"`
-				GoalsAgainst   int `json:"goalsAgainst"`
-				GoalDifference int `json:"goalDifference"`
-				Points         int `json:"points"`
-			} `json:"table"`
-		} `json:"standings"`
+		Response []struct {
+			League struct {
+				Standings [][]struct {
+					Rank int `json:"rank"`
+					Team struct {
+						ID   int    `json:"id"`
+						Name string `json:"name"`
+						Logo string `json:"logo"`
+					} `json:"team"`
+					All struct {
+						Played int `json:"played"`
+						Win    int `json:"win"`
+						Draw   int `json:"draw"`
+						Lose   int `json:"lose"`
+						Goals  struct {
+							For     int `json:"for"`
+							Against int `json:"against"`
+						} `json:"goals"`
+					} `json:"all"`
+					GoalsDiff int `json:"goalsDiff"`
+					Points    int `json:"points"`
+				} `json:"standings"`
+			} `json:"league"`
+		} `json:"response"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	if len(response.Standings) == 0 {
+	if len(response.Response) == 0 || len(response.Response[0].League.Standings) == 0 {
 		return []api.LeagueTableEntry{}, nil
 	}
 
-	entries := make([]api.LeagueTableEntry, 0, len(response.Standings[0].Table))
-	for _, row := range response.Standings[0].Table {
+	entries := make([]api.LeagueTableEntry, 0)
+	for _, row := range response.Response[0].League.Standings[0] {
 		entries = append(entries, api.LeagueTableEntry{
-			Position: row.Position,
+			Position: row.Rank,
 			Team: api.Team{
-				ID:        row.Team.ID,
-				Name:      row.Team.Name,
-				ShortName: row.Team.ShortName,
-				Logo:      row.Team.Crest,
+				ID:   row.Team.ID,
+				Name: row.Team.Name,
+				Logo: row.Team.Logo,
 			},
-			Played:         row.PlayedGames,
-			Won:            row.Won,
-			Drawn:          row.Draw,
-			Lost:           row.Lost,
-			GoalsFor:       row.GoalsFor,
-			GoalsAgainst:   row.GoalsAgainst,
-			GoalDifference: row.GoalDifference,
+			Played:         row.All.Played,
+			Won:            row.All.Win,
+			Drawn:          row.All.Draw,
+			Lost:           row.All.Lose,
+			GoalsFor:       row.All.Goals.For,
+			GoalsAgainst:   row.All.Goals.Against,
+			GoalDifference: row.GoalsDiff,
 			Points:         row.Points,
 		})
 	}

@@ -6,116 +6,123 @@ import (
 	"github.com/0xjuanma/golazo/internal/api"
 )
 
-// footballdataMatch represents a match in Football-Data.org API format
+// footballdataMatch represents a match in API-Football.com format
 type footballdataMatch struct {
-	ID       int    `json:"id"`
-	UTCDate  string `json:"utcDate"`
-	Status   string `json:"status"`
-	Matchday int    `json:"matchday"`
-	Stage    string `json:"stage"`
-	Venue    string `json:"venue,omitempty"`
+	Fixture struct {
+		ID     int    `json:"id"`
+		Date   string `json:"date"`
+		Status struct {
+			Short string `json:"short"` // FT, NS, LIVE, etc.
+			Long  string `json:"long"`
+		} `json:"status"`
+		Venue struct {
+			Name string `json:"name"`
+		} `json:"venue"`
+	} `json:"fixture"`
 
-	Competition struct {
-		ID   int    `json:"id"`
-		Name string `json:"name"`
-		Code string `json:"code"`
-	} `json:"competition"`
+	League struct {
+		ID      int    `json:"id"`
+		Name    string `json:"name"`
+		Country string `json:"country"`
+		Logo    string `json:"logo"`
+		Round   string `json:"round,omitempty"`
+	} `json:"league"`
 
-	HomeTeam struct {
-		ID        int    `json:"id"`
-		Name      string `json:"name"`
-		ShortName string `json:"shortName"`
-		TLA       string `json:"tla"`
-		Crest     string `json:"crest,omitempty"`
-	} `json:"homeTeam"`
+	Teams struct {
+		Home struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"home"`
+		Away struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"away"`
+	} `json:"teams"`
 
-	AwayTeam struct {
-		ID        int    `json:"id"`
-		Name      string `json:"name"`
-		ShortName string `json:"shortName"`
-		TLA       string `json:"tla"`
-		Crest     string `json:"crest,omitempty"`
-	} `json:"awayTeam"`
+	Goals struct {
+		Home *int `json:"home"`
+		Away *int `json:"away"`
+	} `json:"goals"`
 
 	Score struct {
-		Winner   string `json:"winner,omitempty"`
-		Duration string `json:"duration,omitempty"`
 		FullTime struct {
-			HomeTeam *int `json:"homeTeam,omitempty"`
-			AwayTeam *int `json:"awayTeam,omitempty"`
-		} `json:"fullTime"`
+			Home *int `json:"home"`
+			Away *int `json:"away"`
+		} `json:"fulltime"`
 		HalfTime struct {
-			HomeTeam *int `json:"homeTeam,omitempty"`
-			AwayTeam *int `json:"awayTeam,omitempty"`
-		} `json:"halfTime"`
+			Home *int `json:"home"`
+			Away *int `json:"away"`
+		} `json:"halftime"`
 	} `json:"score"`
 }
 
-// footballdataMatchesResponse represents the response from /v4/matches endpoint
+// footballdataMatchesResponse represents the response from API-Football.com fixtures endpoint
 type footballdataMatchesResponse struct {
-	Matches []footballdataMatch `json:"matches"`
-}
-
-// footballdataMatchDetails represents detailed match information
-type footballdataMatchDetails struct {
-	footballdataMatch
-	Attendance int `json:"attendance,omitempty"`
-	Minute     int `json:"minute,omitempty"`
+	Response []footballdataMatch `json:"response"`
 }
 
 // toAPIMatch converts a footballdataMatch to api.Match
 func (m footballdataMatch) toAPIMatch() api.Match {
 	match := api.Match{
-		ID: m.ID,
+		ID: m.Fixture.ID,
 		League: api.League{
-			ID:   m.Competition.ID,
-			Name: m.Competition.Name,
+			ID:      m.League.ID,
+			Name:    m.League.Name,
+			Country: m.League.Country,
+			Logo:    m.League.Logo,
 		},
 		HomeTeam: api.Team{
-			ID:        m.HomeTeam.ID,
-			Name:      m.HomeTeam.Name,
-			ShortName: m.HomeTeam.ShortName,
-			Logo:      m.HomeTeam.Crest,
+			ID:   m.Teams.Home.ID,
+			Name: m.Teams.Home.Name,
 		},
 		AwayTeam: api.Team{
-			ID:        m.AwayTeam.ID,
-			Name:      m.AwayTeam.Name,
-			ShortName: m.AwayTeam.ShortName,
-			Logo:      m.AwayTeam.Crest,
+			ID:   m.Teams.Away.ID,
+			Name: m.Teams.Away.Name,
 		},
-		Round: m.Stage,
+		Round: m.League.Round,
 	}
 
+	// Set short names (use name if short name not available)
+	match.HomeTeam.ShortName = m.Teams.Home.Name
+	match.AwayTeam.ShortName = m.Teams.Away.Name
+
 	// Parse match time
-	if m.UTCDate != "" {
-		if t, err := time.Parse(time.RFC3339, m.UTCDate); err == nil {
+	if m.Fixture.Date != "" {
+		if t, err := time.Parse(time.RFC3339, m.Fixture.Date); err == nil {
 			match.MatchTime = &t
 		}
 	}
 
-	// Map status
-	switch m.Status {
-	case "FINISHED":
+	// Map status (API-Football.com uses short status codes)
+	switch m.Fixture.Status.Short {
+	case "FT", "AET", "PEN":
 		match.Status = api.MatchStatusFinished
-	case "LIVE", "IN_PLAY":
+	case "LIVE", "HT", "1H", "2H", "ET", "BT", "P", "SUSP", "INT":
 		match.Status = api.MatchStatusLive
-	case "SCHEDULED", "TIMED":
+	case "NS", "TBD":
 		match.Status = api.MatchStatusNotStarted
-	case "POSTPONED":
-		match.Status = api.MatchStatusPostponed
-	case "CANCELLED":
+	case "CANC", "PST":
 		match.Status = api.MatchStatusCancelled
+	case "POST":
+		match.Status = api.MatchStatusPostponed
 	default:
 		match.Status = api.MatchStatusNotStarted
 	}
 
-	// Set scores if available
-	if m.Score.FullTime.HomeTeam != nil {
-		homeScore := *m.Score.FullTime.HomeTeam
+	// Set scores - prefer goals field, fallback to score.fulltime
+	if m.Goals.Home != nil {
+		homeScore := *m.Goals.Home
+		match.HomeScore = &homeScore
+	} else if m.Score.FullTime.Home != nil {
+		homeScore := *m.Score.FullTime.Home
 		match.HomeScore = &homeScore
 	}
-	if m.Score.FullTime.AwayTeam != nil {
-		awayScore := *m.Score.FullTime.AwayTeam
+
+	if m.Goals.Away != nil {
+		awayScore := *m.Goals.Away
+		match.AwayScore = &awayScore
+	} else if m.Score.FullTime.Away != nil {
+		awayScore := *m.Score.FullTime.Away
 		match.AwayScore = &awayScore
 	}
 
