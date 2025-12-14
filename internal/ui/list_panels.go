@@ -73,7 +73,7 @@ func RenderMultiPanelViewWithList(width, height int, listModel list.Model, detai
 	// Reserve space for spinner at top (always reserve to prevent layout shift)
 	spinnerHeight := 2
 	availableHeight := height - spinnerHeight
-	
+
 	// Render spinner if loading (reserved space prevents layout shift)
 	var spinnerLine string
 	if viewLoading && randomSpinner != nil {
@@ -129,7 +129,7 @@ func RenderStatsViewWithList(width, height int, listModel list.Model, details *a
 	// Reserve space for spinner at top (always reserve to prevent layout shift)
 	spinnerHeight := 2
 	availableHeight := height - spinnerHeight
-	
+
 	// Render spinner if loading (reserved space prevents layout shift)
 	var spinnerLine string
 	if viewLoading && randomSpinner != nil {

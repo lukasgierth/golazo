@@ -105,7 +105,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// List sizes will be updated in View() method when rendering
+		// Update list sizes when window size changes
+		if m.currentView == viewLiveMatches {
+			leftWidth := m.width * 35 / 100
+			if leftWidth < 25 {
+				leftWidth = 25
+			}
+			h, v := 2, 2 // Approximate frame size
+			titleHeight := 3
+			spinnerHeight := 2
+			availableWidth := leftWidth - h*2
+			availableHeight := m.height - v*2 - titleHeight - spinnerHeight
+			if availableWidth > 0 && availableHeight > 0 {
+				m.liveMatchesList.SetSize(availableWidth, availableHeight)
+			}
+		} else if m.currentView == viewStats {
+			leftWidth := m.width * 40 / 100
+			if leftWidth < 30 {
+				leftWidth = 30
+			}
+			h, v := 2, 2
+			titleHeight := 3
+			spinnerHeight := 2
+			availableWidth := leftWidth - h*2
+			availableHeight := m.height - v*2 - titleHeight - spinnerHeight
+			if availableWidth > 0 && availableHeight > 0 {
+				m.statsMatchesList.SetSize(availableWidth, availableHeight)
+			}
+		}
 		return m, nil
 	case spinner.TickMsg:
 		if m.loading || m.mainViewLoading {
@@ -225,6 +252,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	case liveMatchesMsg:
+		// Debug: Check if we got matches
+		if len(msg.matches) == 0 {
+			// No matches found, but stop loading
+			m.liveViewLoading = false
+			m.loading = false
+			return m, nil
+		}
 		m.liveViewLoading = false
 		// Convert to display format
 		displayMatches := make([]ui.MatchDisplay, 0, len(msg.matches))
@@ -243,6 +277,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.liveMatchesList.SetItems(items)
 
 		// Set list size based on current window dimensions
+		// Account for spinner height at top
+		spinnerHeight := 2
 		if m.width > 0 && m.height > 0 {
 			leftWidth := m.width * 35 / 100
 			if leftWidth < 25 {
@@ -253,7 +289,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			frameHeight := 6
 			titleHeight := 3
 			availableWidth := leftWidth - frameWidth
-			availableHeight := m.height - frameHeight - titleHeight
+			availableHeight := m.height - frameHeight - titleHeight - spinnerHeight
 			if availableWidth > 0 && availableHeight > 0 {
 				m.liveMatchesList.SetSize(availableWidth, availableHeight)
 			}
