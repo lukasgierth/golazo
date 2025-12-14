@@ -9,9 +9,9 @@ import (
 	"github.com/0xjuanma/golazo/internal/api"
 )
 
-// LiveMatches retrieves all currently live matches.
-// This fetches today's matches and filters for live ones.
-// Conservative: Only fetches once, caller should cache results.
+// LiveMatches retrieves all currently live matches for today.
+// Fetches matches from supported leagues and filters for those that have started but not finished.
+// Matches are already filtered by supported leagues in MatchesByDate.
 func (c *Client) LiveMatches(ctx context.Context) ([]api.Match, error) {
 	today := time.Now()
 	matches, err := c.MatchesByDate(ctx, today)
@@ -19,17 +19,13 @@ func (c *Client) LiveMatches(ctx context.Context) ([]api.Match, error) {
 		return nil, fmt.Errorf("fetch matches for today: %w", err)
 	}
 
-	// Filter for live matches only
+	// Filter for live matches only (started but not finished)
 	liveMatches := make([]api.Match, 0)
 	for _, match := range matches {
+		// Only include matches that are live (started but not finished)
 		if match.Status == api.MatchStatusLive {
 			liveMatches = append(liveMatches, match)
 		}
-	}
-
-	// Limit to 10 matches to be conservative
-	if len(liveMatches) > 10 {
-		liveMatches = liveMatches[:10]
 	}
 
 	return liveMatches, nil

@@ -15,25 +15,21 @@ const (
 )
 
 // Supported league IDs for match fetching
-// These can be easily extended by adding more league IDs to the slice
+// Limited to top 5 leagues to match stats view and optimize API calls
 var (
 	// SupportedLeagues contains the league IDs that will be queried for matches.
-	// To add more leagues, simply append their IDs to this slice.
-	// Known league IDs:
+	// FotMob league IDs (different from API-Sports.io IDs):
 	//   - Premier League: 47
 	//   - La Liga: 87
 	//   - Bundesliga: 54
-	//   - Champions League: 42
 	//   - Serie A: 55
-	//   - MLS: 130
 	//   - Ligue 1: 53
 	SupportedLeagues = []int{
-		47,  // Premier League
-		87,  // La Liga
-		54,  // Bundesliga
-		42,  // Champions League
-		55,  // Serie A
-		130, // MLS
+		47, // Premier League
+		87, // La Liga
+		54, // Bundesliga
+		55, // Serie A
+		53, // Ligue 1
 	}
 )
 
