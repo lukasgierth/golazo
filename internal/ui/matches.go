@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/0xjuanma/golazo/internal/api"
@@ -10,6 +11,39 @@ import (
 // MatchDisplay wraps a match with display information for rendering.
 type MatchDisplay struct {
 	api.Match
+}
+
+// Title returns a formatted title for the match.
+func (m MatchDisplay) Title() string {
+	home := m.HomeTeam.ShortName
+	if home == "" {
+		home = m.HomeTeam.Name
+	}
+	away := m.AwayTeam.ShortName
+	if away == "" {
+		away = m.AwayTeam.Name
+	}
+	return home + " vs " + away
+}
+
+// Description returns a formatted description for the match.
+func (m MatchDisplay) Description() string {
+	var desc string
+	if m.HomeScore != nil && m.AwayScore != nil {
+		desc = fmt.Sprintf("%d - %d", *m.HomeScore, *m.AwayScore)
+	} else {
+		desc = "vs"
+	}
+
+	if m.League.Name != "" {
+		desc += " • " + m.League.Name
+	}
+
+	if m.LiveTime != nil {
+		desc += " • " + *m.LiveTime
+	}
+
+	return desc
 }
 
 var (
