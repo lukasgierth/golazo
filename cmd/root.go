@@ -13,8 +13,8 @@ var mockFlag bool
 
 var rootCmd = &cobra.Command{
 	Use:   "golazo",
-	Short: "Live football match updates in your terminal",
-	Long:  `A minimalistic TUI application that displays RSS feeds for football matches in the terminal.`,
+	Short: "Football match stats and updates in your terminal",
+	Long:  `A modern terminal user interface for real-time football stats and scores, covering multiple leagues and competitions.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		p := tea.NewProgram(app.NewModel(mockFlag), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
