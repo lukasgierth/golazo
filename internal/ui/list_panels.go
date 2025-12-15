@@ -230,6 +230,7 @@ func RenderMultiPanelViewWithList(width, height int, listModel list.Model, detai
 }
 
 // RenderStatsViewWithList renders the stats view with list component.
+// Rebuilt to match live view structure exactly: spinner at top, left panel (matches), right panel (details).
 func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomingList list.Model, details *api.MatchDetails, randomSpinner *RandomCharSpinner, viewLoading bool, dateRange int, apiKeyMissing bool) string {
 	// Handle edge case: if width/height not set, use defaults
 	if width <= 0 {
@@ -240,15 +241,14 @@ func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomin
 	}
 
 	// Reserve 3 lines at top for spinner (always reserve to prevent layout shift)
+	// Match live view exactly
 	spinnerHeight := 3
 	availableHeight := height - spinnerHeight
 	if availableHeight < 10 {
 		availableHeight = 10 // Minimum height for panels
 	}
 
-	// Render spinner centered in reserved space
-	// ALWAYS show spinner when viewLoading is true - ensure it's visible immediately
-	// Match live view implementation exactly
+	// Render spinner centered in reserved space - match live view exactly
 	var spinnerArea string
 	if viewLoading && randomSpinner != nil {
 		spinnerView := randomSpinner.View()
@@ -269,83 +269,50 @@ func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomin
 				AlignVertical(lipgloss.Center)
 			spinnerArea = spinnerStyle.Render("Loading...")
 		}
-	} else if viewLoading {
-		// Fallback when viewLoading is true but randomSpinner is nil
-		spinnerStyle := lipgloss.NewStyle().
-			Width(width).
-			Height(spinnerHeight).
-			Align(lipgloss.Center).
-			AlignVertical(lipgloss.Center)
-		spinnerArea = spinnerStyle.Render("Loading...")
 	} else {
 		// Reserve space with empty lines - ensure it takes up exactly spinnerHeight lines
 		spinnerArea = strings.Repeat("\n", spinnerHeight)
 	}
 
-	// Calculate panel dimensions
-	// Left side: 50% width (matches list, full height)
-	// Right side: 50% width (split vertically: overview top, statistics bottom)
-	leftWidth := width * 50 / 100
-	if leftWidth < 30 {
-		leftWidth = 30
+	// Calculate panel dimensions - match live view exactly (35% left, 65% right)
+	leftWidth := width * 35 / 100
+	if leftWidth < 25 {
+		leftWidth = 25
 	}
 	rightWidth := width - leftWidth - 1
-	if rightWidth < 30 {
-		rightWidth = 30
+	if rightWidth < 35 {
+		rightWidth = 35
 		leftWidth = width - rightWidth - 1
 	}
 
+	// Use panelHeight similar to live view to ensure proper spacing
 	panelHeight := availableHeight - 2
-	rightPanelHeight := panelHeight / 2 // Split right panel vertically
 
-	// Render left panel (finished matches list) - full height
+	// Render left panel (finished matches list) - match live view structure
+	// For 1-day view, combine finished and upcoming lists vertically
 	leftPanel := RenderStatsListPanel(leftWidth, panelHeight, finishedList, upcomingList, dateRange, apiKeyMissing)
 
-	// Render right panels (overview top, statistics bottom)
-	overviewPanel := renderMatchOverviewPanel(rightWidth, rightPanelHeight, details)
-	statisticsPanel := renderMatchStatisticsPanel(rightWidth, rightPanelHeight, details)
+	// Render right panel (match details) - use same renderer as live view but without title
+	// Call renderMatchDetailsPanelWithTitle with showTitle=false to remove hardcoded title
+	rightPanel := renderMatchDetailsPanelWithTitle(rightWidth, panelHeight, details, []string{}, spinner.Model{}, false, false)
 
-	// Create vertical separator between left and right - match panel height exactly
-	verticalSeparatorStyle := lipgloss.NewStyle().
+	// Create separator - match live view exactly
+	separatorStyle := lipgloss.NewStyle().
 		Foreground(borderColor).
 		Height(panelHeight).
-		Padding(0, 0)
-	verticalSeparator := verticalSeparatorStyle.Render("│")
+		Padding(0, 1)
+	separator := separatorStyle.Render("│")
 
-	// Create horizontal separator between overview and statistics
-	// Use exact width without extra padding to avoid extra lines
-	horizontalSeparatorStyle := lipgloss.NewStyle().
-		Foreground(borderColor).
-		Width(rightWidth)
-	horizontalSeparator := horizontalSeparatorStyle.Render(strings.Repeat("─", rightWidth-4))
-
-	// Combine right panels vertically - join directly without extra spacing
-	rightPanels := lipgloss.JoinVertical(
-		lipgloss.Top,
-		overviewPanel,
-		horizontalSeparator,
-		statisticsPanel,
-	)
-
-	// Combine left and right horizontally
+	// Combine panels - match live view exactly
 	panels := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		leftPanel,
-		verticalSeparator,
-		rightPanels,
+		separator,
+		rightPanel,
 	)
 
 	// Combine spinner area and panels - this shifts panels down
-	// Use lipgloss.Left (not Top) to match live view exactly
-	// Ensure spinner area is always at the top, even if empty
-	// DEBUG: Force spinner area to be visible - add explicit content
-	if viewLoading {
-		// Ensure spinner area has actual content when loading
-		if strings.TrimSpace(spinnerArea) == "" {
-			spinnerArea = strings.Repeat("⏳ LOADING...\n", spinnerHeight)
-		}
-	}
-
+	// Match live view exactly - use lipgloss.Left
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		spinnerArea,
