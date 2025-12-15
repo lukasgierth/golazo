@@ -55,48 +55,64 @@ func NewClient(apiKey string) *Client {
 func (c *Client) FinishedMatchesByDateRange(ctx context.Context, dateFrom, dateTo time.Time) ([]api.Match, error) {
 	allMatches := make([]api.Match, 0)
 
+	// Create a set of supported league IDs for quick lookup
+	supportedLeagueSet := make(map[int]bool)
+	for _, id := range SupportedLeagues {
+		supportedLeagueSet[id] = true
+	}
+
 	// API-Sports.io date range queries (from/to) don't work reliably
 	// Instead, query each date individually and aggregate results
-	currentDate := dateFrom
-	for !currentDate.After(dateTo) {
+	// Normalize dates to UTC to avoid timezone issues
+	currentDate := dateFrom.UTC()
+	dateToUTC := dateTo.UTC()
+	for !currentDate.After(dateToUTC) {
 		dateStr := currentDate.Format("2006-01-02")
 
-		// Query each supported league for this date
-		for _, leagueID := range SupportedLeagues {
-			// Use single date parameter with league and status filter
-			url := fmt.Sprintf("%s/fixtures?date=%s&league=%d&status=FT", c.baseURL, dateStr, leagueID)
+		// API-Sports.io league-specific queries don't work reliably (require season parameter which may be incorrect)
+		// Instead, query all finished matches for each date and filter by supported leagues
+		// This matches the approach used in the analyze script which successfully finds matches
+		url := fmt.Sprintf("%s/fixtures?date=%s&status=FT", c.baseURL, dateStr)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			// Move to next date on request creation error
+			currentDate = currentDate.AddDate(0, 0, 1)
+			continue
+		}
 
-			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-			if err != nil {
-				continue // Skip this league on error
-			}
+		req.Header.Set("x-apisports-key", c.apiKey)
 
-			req.Header.Set("x-apisports-key", c.apiKey)
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			// Move to next date on request error
+			currentDate = currentDate.AddDate(0, 0, 1)
+			continue
+		}
 
-			resp, err := c.httpClient.Do(req)
-			if err != nil {
-				continue // Skip this league on request error
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				// Read error response body for debugging (but don't fail completely)
-				io.ReadAll(resp.Body) // Discard response body
-				resp.Body.Close()
-				// Continue to next league instead of failing completely
-				continue
-			}
-
-			var response footballdataMatchesResponse
-			if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-				resp.Body.Close()
-				continue // Skip this league on parse error
-			}
+		if resp.StatusCode != http.StatusOK {
+			// Read and discard error response body
+			io.ReadAll(resp.Body)
 			resp.Body.Close()
+			// Move to next date on HTTP error
+			currentDate = currentDate.AddDate(0, 0, 1)
+			continue
+		}
 
-			// Convert all matches (already filtered by status=FT in the API call)
-			for _, m := range response.Response {
+		var response footballdataMatchesResponse
+		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+			resp.Body.Close()
+			// Move to next date on parse error
+			currentDate = currentDate.AddDate(0, 0, 1)
+			continue
+		}
+		resp.Body.Close()
+
+		// Filter for finished matches in supported leagues
+		for _, m := range response.Response {
+			// Check if this match is from a supported league
+			if supportedLeagueSet[m.League.ID] {
 				apiMatch := m.toAPIMatch()
-				// Double-check status is finished (should already be filtered by API)
+				// Double-check status is finished
 				if apiMatch.Status == api.MatchStatusFinished {
 					allMatches = append(allMatches, apiMatch)
 				}
@@ -112,11 +128,13 @@ func (c *Client) FinishedMatchesByDateRange(ctx context.Context, dateFrom, dateT
 
 // RecentFinishedMatches retrieves finished matches from the last N days.
 // Queries from today going back N-1 days (inclusive).
+// Uses UTC timezone to ensure consistent date calculations.
 func (c *Client) RecentFinishedMatches(ctx context.Context, days int) ([]api.Match, error) {
 	if days <= 0 {
 		days = 1 // Default to 1 day if invalid
 	}
-	today := time.Now()
+	// Use UTC to avoid timezone issues
+	today := time.Now().UTC()
 	dateFrom := today.AddDate(0, 0, -(days - 1)) // Go back (days-1) days to include today
 	return c.FinishedMatchesByDateRange(ctx, dateFrom, today)
 }
