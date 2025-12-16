@@ -23,31 +23,30 @@ const (
 )
 
 type model struct {
-	width                     int
-	height                    int
-	currentView               view
-	matches                   []ui.MatchDisplay
-	upcomingMatches           []ui.MatchDisplay // Upcoming matches for 1-day stats view
-	selected                  int
-	matchDetails              *api.MatchDetails
-	liveUpdates               []string
-	spinner                   spinner.Model
-	randomSpinner             *ui.RandomCharSpinner
-	statsViewSpinner          *ui.RandomCharSpinner // Separate spinner instance for stats view
-	loading                   bool
-	mainViewLoading           bool
-	liveViewLoading           bool
-	statsViewLoading          bool
-	useMockData               bool
-	fotmobClient              *fotmob.Client
-	parser                    *fotmob.LiveUpdateParser
-	lastEvents                []api.MatchEvent
-	polling                   bool
-	liveMatchesList           list.Model
-	statsMatchesList          list.Model
-	upcomingMatchesList       list.Model
-	statsDateRange            int       // 1 or 3 days (default: 1)
-	statsViewSpinnerStartTime time.Time // Track when spinner started to ensure minimum 1s display
+	width               int
+	height              int
+	currentView         view
+	matches             []ui.MatchDisplay
+	upcomingMatches     []ui.MatchDisplay // Upcoming matches for 1-day stats view
+	selected            int
+	matchDetails        *api.MatchDetails
+	liveUpdates         []string
+	spinner             spinner.Model
+	randomSpinner       *ui.RandomCharSpinner
+	statsViewSpinner    *ui.RandomCharSpinner // Separate spinner instance for stats view
+	loading             bool
+	mainViewLoading     bool
+	liveViewLoading     bool
+	statsViewLoading    bool
+	useMockData         bool
+	fotmobClient        *fotmob.Client
+	parser              *fotmob.LiveUpdateParser
+	lastEvents          []api.MatchEvent
+	polling             bool
+	liveMatchesList     list.Model
+	statsMatchesList    list.Model
+	upcomingMatchesList list.Model
+	statsDateRange      int // 1 or 3 days (default: 1)
 }
 
 // NewModel creates a new application model with default values.
@@ -206,13 +205,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else if m.currentView == viewStats {
 				// For stats view, set loading to false when match details are loaded
-				// Turn off spinner after minimum 1 second
 				m.loading = false
-				elapsed := time.Since(m.statsViewSpinnerStartTime)
-				if elapsed >= 1*time.Second {
-					m.statsViewLoading = false
-				}
-				// If less than 1 second, keep spinner visible (it will be turned off on next update)
+				m.statsViewLoading = false
 			} else {
 				// For other views (main), set both to false
 				m.loading = false
@@ -220,6 +214,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.statsViewLoading = false
 			}
 		} else {
+			// Match details is nil - this means the API call failed or returned no data
+			// Still turn off loading states
 			m.loading = false
 			m.liveViewLoading = false
 			m.statsViewLoading = false
@@ -381,18 +377,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			// For 3-day view, stop loading since no upcoming matches are fetched
-			// Turn off spinner after minimum 1 second
-			elapsed := time.Since(m.statsViewSpinnerStartTime)
-			if elapsed >= 1*time.Second {
-				m.statsViewLoading = false
-			}
+			m.statsViewLoading = false
 			m.loading = false
 			return m, nil
 		}
 		// Keep loading state true until match details are loaded
-		// Convert to display format
-		displayMatches := make([]ui.MatchDisplay, 0, len(msg.matches))
+		// Deduplicate matches by ID (API may return duplicates from fixtures+results tabs)
+		seen := make(map[int]bool)
+		uniqueMatches := make([]api.Match, 0, len(msg.matches))
 		for _, match := range msg.matches {
+			if !seen[match.ID] {
+				seen[match.ID] = true
+				uniqueMatches = append(uniqueMatches, match)
+			}
+		}
+		// Convert to display format
+		displayMatches := make([]ui.MatchDisplay, 0, len(uniqueMatches))
+		for _, match := range uniqueMatches {
 			displayMatches = append(displayMatches, ui.MatchDisplay{
 				Match: match,
 			})
@@ -424,18 +425,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 
-		// If no matches to load details for, check if we're still waiting for upcoming matches
-		// Only stop loading if we're not in 1-day view (which fetches upcoming matches)
-		// For 1-day view, keep spinner visible until upcoming matches arrive
-		// For 3-day view, turn off spinner after minimum 1 second
-		if m.statsDateRange != 1 {
-			// 3-day view: no upcoming matches, so turn off spinner after minimum 1 second
-			elapsed := time.Since(m.statsViewSpinnerStartTime)
-			if elapsed >= 1*time.Second {
-				m.statsViewLoading = false
-			}
-		}
-		// For 1-day view, spinner will be turned off when upcoming matches arrive
+		// If no matches to load details for, turn off spinner
+		m.statsViewLoading = false
 		return m, tea.Batch(cmds...)
 	case upcomingMatchesMsg:
 		// Convert upcoming matches to display format
@@ -450,21 +441,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update upcoming matches list
 		m.upcomingMatchesList.SetItems(ui.ToMatchListItems(displayMatches))
 
-		// If match details are already loaded, turn off spinner (after minimum 1 second)
+		// If match details are already loaded, turn off spinner
 		// Otherwise, keep spinner visible until match details are loaded
 		if m.matchDetails != nil {
-			// Match details already loaded - turn off spinner after minimum 1 second
-			elapsed := time.Since(m.statsViewSpinnerStartTime)
-			if elapsed >= 1*time.Second {
-				m.statsViewLoading = false
-			}
-		} else {
-			// Match details not loaded yet - keep spinner visible
-			// Re-initialize stats view spinner to ensure it's animating
-			if m.statsViewLoading {
-				cmds = append(cmds, m.statsViewSpinner.Init())
-			}
+			m.statsViewLoading = false
 		}
+		// If match details not loaded yet, spinner will be turned off when matchDetailsMsg arrives
 		return m, tea.Batch(cmds...)
 	case ui.TickMsg:
 		// Handle random spinner tick for main and live views
@@ -511,7 +493,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statsViewLoading = true
 			m.currentView = viewStats
 			m.loading = true
-			m.statsViewSpinnerStartTime = time.Now() // Track spinner start time for minimum display duration
 
 			var cmds []tea.Cmd
 			// Use dedicated stats view spinner - initialize immediately when entering stats view
@@ -966,15 +947,18 @@ func fetchStatsMatchDetailsFotmob(client *fotmob.Client, matchID int, useMockDat
 			return matchDetailsMsg{details: nil}
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		details, err := client.MatchDetails(ctx, matchID)
 		if err != nil {
-			// Return nil on error when not using mock data
+			// API call failed - return nil details
+			// The UI will show "Select a match" message when details is nil
+			// TODO: Consider adding error logging or user-visible error message
 			return matchDetailsMsg{details: nil}
 		}
 
+		// Successfully fetched match details
 		return matchDetailsMsg{details: details}
 	}
 }

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/0xjuanma/golazo/internal/api"
@@ -288,9 +289,8 @@ func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomin
 	// For 1-day view, combine finished and upcoming lists vertically
 	leftPanel := RenderStatsListPanel(leftWidth, panelHeight, finishedList, upcomingList, dateRange)
 
-	// Render right panel (match details) - use same renderer as live view but without title
-	// Call renderMatchDetailsPanelWithTitle with showTitle=false to remove hardcoded title
-	rightPanel := renderMatchDetailsPanelWithTitle(rightWidth, panelHeight, details, []string{}, spinner.Model{}, false, false)
+	// Render right panel (match details) - use dedicated stats panel renderer
+	rightPanel := renderStatsMatchDetailsPanel(rightWidth, panelHeight, details)
 
 	// Create separator - match live view exactly
 	separatorStyle := lipgloss.NewStyle().
@@ -316,4 +316,164 @@ func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomin
 	)
 
 	return content
+}
+
+// renderStatsMatchDetailsPanel renders the right panel for stats view with match details.
+// This is a simplified version that always shows basic match info regardless of match status.
+// Designed to be expandable for more detailed statistics in the future.
+func renderStatsMatchDetailsPanel(width, height int, details *api.MatchDetails) string {
+	if details == nil {
+		emptyMessage := lipgloss.NewStyle().
+			Foreground(dimColor).
+			Align(lipgloss.Center).
+			Width(width - 6).
+			PaddingTop(2).
+			Render("Select a match to view details")
+
+		return panelStyle.
+			Width(width).
+			Height(height).
+			Render(emptyMessage)
+	}
+
+	var content strings.Builder
+	infoStyle := lipgloss.NewStyle().Foreground(dimColor)
+
+	// Match Header: Teams and Score
+	teamStyle := lipgloss.NewStyle().
+		Foreground(textColor).
+		Bold(true)
+
+	homeTeam := details.HomeTeam.ShortName
+	if homeTeam == "" {
+		homeTeam = details.HomeTeam.Name
+	}
+	awayTeam := details.AwayTeam.ShortName
+	if awayTeam == "" {
+		awayTeam = details.AwayTeam.Name
+	}
+
+	// Score display
+	if details.HomeScore != nil && details.AwayScore != nil {
+		scoreText := fmt.Sprintf("%s  %d - %d  %s", homeTeam, *details.HomeScore, *details.AwayScore, awayTeam)
+		content.WriteString(teamStyle.Render(scoreText))
+	} else {
+		matchupText := fmt.Sprintf("%s vs %s", homeTeam, awayTeam)
+		content.WriteString(teamStyle.Render(matchupText))
+	}
+	content.WriteString("\n")
+
+	// Status
+	var statusText string
+	switch details.Status {
+	case api.MatchStatusFinished:
+		statusText = "Full Time"
+	case api.MatchStatusLive:
+		if details.LiveTime != nil {
+			statusText = *details.LiveTime
+		} else {
+			statusText = "LIVE"
+		}
+	case api.MatchStatusNotStarted:
+		if details.MatchTime != nil {
+			statusText = details.MatchTime.Format("15:04")
+		} else {
+			statusText = "Not Started"
+		}
+	default:
+		statusText = string(details.Status)
+	}
+	content.WriteString(infoStyle.Render(statusText))
+	content.WriteString("\n")
+
+	// League
+	if details.League.Name != "" {
+		content.WriteString(infoStyle.Italic(true).Render(details.League.Name))
+		content.WriteString("\n")
+	}
+
+	// Venue (if available)
+	if details.Venue != "" {
+		content.WriteString(infoStyle.Render("📍 " + details.Venue))
+		content.WriteString("\n")
+	}
+
+	// Half-time score (if available)
+	if details.HalfTimeScore != nil && details.HalfTimeScore.Home != nil && details.HalfTimeScore.Away != nil {
+		htText := fmt.Sprintf("HT: %d - %d", *details.HalfTimeScore.Home, *details.HalfTimeScore.Away)
+		content.WriteString(infoStyle.Render(htText))
+		content.WriteString("\n")
+	}
+
+	content.WriteString("\n")
+
+	// Goals section (if any)
+	var goals []api.MatchEvent
+	for _, event := range details.Events {
+		if event.Type == "goal" {
+			goals = append(goals, event)
+		}
+	}
+
+	if len(goals) > 0 {
+		goalsTitle := lipgloss.NewStyle().
+			Foreground(accentColor).
+			Bold(true).
+			Render("⚽ Goals")
+		content.WriteString(goalsTitle)
+		content.WriteString("\n")
+
+		for _, goal := range goals {
+			player := "Unknown"
+			if goal.Player != nil {
+				player = *goal.Player
+			}
+			team := goal.Team.ShortName
+			if team == "" {
+				team = goal.Team.Name
+			}
+			goalLine := fmt.Sprintf("%d' %s (%s)", goal.Minute, player, team)
+			content.WriteString(infoStyle.Render(goalLine))
+			content.WriteString("\n")
+		}
+		content.WriteString("\n")
+	}
+
+	// Cards section (count only)
+	var yellowCards, redCards int
+	for _, event := range details.Events {
+		if event.Type == "card" {
+			if event.EventType != nil {
+				if *event.EventType == "yellow" {
+					yellowCards++
+				} else if *event.EventType == "red" {
+					redCards++
+				}
+			}
+		}
+	}
+
+	if yellowCards > 0 || redCards > 0 {
+		cardsTitle := lipgloss.NewStyle().
+			Foreground(accentColor).
+			Bold(true).
+			Render("Cards")
+		content.WriteString(cardsTitle)
+		content.WriteString("\n")
+
+		cardParts := make([]string, 0)
+		if yellowCards > 0 {
+			cardParts = append(cardParts, fmt.Sprintf("%d🟨", yellowCards))
+		}
+		if redCards > 0 {
+			cardParts = append(cardParts, fmt.Sprintf("%d🟥", redCards))
+		}
+		content.WriteString(infoStyle.Render(strings.Join(cardParts, " ")))
+		content.WriteString("\n")
+	}
+
+	return panelStyle.
+		Width(width).
+		Height(height).
+		Render(content.String())
 }

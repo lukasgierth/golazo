@@ -2,7 +2,7 @@
   <img src="assets/golazo-logo.png" alt="Golazo demo" width="600">
 </p>
 
-# Golazo 
+# Golazo
 
 > [!IMPORTANT]
 > Tool is in active development.

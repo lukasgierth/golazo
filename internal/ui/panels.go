@@ -314,41 +314,209 @@ func renderMatchDetailsPanelWithTitle(width, height int, details *api.MatchDetai
 	))
 	content.WriteString("\n")
 
-	// Live Updates section
-	updatesTitle := lipgloss.NewStyle().
-		Foreground(accentColor).
-		Bold(true).
-		PaddingTop(0).
-		BorderBottom(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(borderColor).
-		Width(width - 6).
-		Render(constants.PanelUpdates)
-	content.WriteString(updatesTitle)
-	content.WriteString("\n")
+	// Teams section
+	teamsText := fmt.Sprintf("%s vs %s", details.HomeTeam.ShortName, details.AwayTeam.ShortName)
+	content.WriteString(infoStyle.Render(teamsText))
+	content.WriteString("\n\n")
 
-	// Show spinner if loading
-	if loading {
-		spinnerText := spinnerStyle.Render(sp.View() + " " + constants.LoadingFetching)
-		content.WriteString(spinnerText)
-		content.WriteString("\n")
-	}
+	// For finished matches, show detailed match information
+	// For live matches, show live updates
+	if details.Status == api.MatchStatusFinished {
+		// Match Information section
+		infoSection := make([]string, 0)
 
-	// Display live updates (newest first)
-	if len(liveUpdates) == 0 && !loading {
-		emptyUpdates := lipgloss.NewStyle().
-			Foreground(dimColor).
-			Padding(0, 0).
-			Render(constants.EmptyNoUpdates)
-		content.WriteString(emptyUpdates)
-	} else if len(liveUpdates) > 0 {
-		// Show updates in reverse order (newest at top)
-		updatesList := make([]string, 0, len(liveUpdates))
-		for i := len(liveUpdates) - 1; i >= 0; i-- {
-			updateLine := liveUpdateStyle.Render(liveUpdates[i])
-			updatesList = append(updatesList, updateLine)
+		// Venue
+		if details.Venue != "" {
+			infoSection = append(infoSection, fmt.Sprintf("📍 %s", details.Venue))
 		}
-		content.WriteString(strings.Join(updatesList, "\n"))
+
+		// Half-time score
+		if details.HalfTimeScore != nil && details.HalfTimeScore.Home != nil && details.HalfTimeScore.Away != nil {
+			htText := fmt.Sprintf("HT: %d - %d", *details.HalfTimeScore.Home, *details.HalfTimeScore.Away)
+			infoSection = append(infoSection, infoStyle.Render(htText))
+		}
+
+		// Match duration
+		if details.ExtraTime {
+			infoSection = append(infoSection, infoStyle.Render("⏱️  AET"))
+		}
+		if details.Penalties != nil && details.Penalties.Home != nil && details.Penalties.Away != nil {
+			penText := fmt.Sprintf("Pens: %d - %d", *details.Penalties.Home, *details.Penalties.Away)
+			infoSection = append(infoSection, infoStyle.Render(penText))
+		}
+
+		if len(infoSection) > 0 {
+			content.WriteString(strings.Join(infoSection, " | "))
+			content.WriteString("\n\n")
+		}
+
+		// Goals Timeline section
+		goals := make([]api.MatchEvent, 0)
+		for _, event := range details.Events {
+			if event.Type == "goal" {
+				goals = append(goals, event)
+			}
+		}
+
+		if len(goals) > 0 {
+			goalsTitle := lipgloss.NewStyle().
+				Foreground(accentColor).
+				Bold(true).
+				PaddingTop(0).
+				BorderBottom(true).
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderForeground(borderColor).
+				Width(width - 6).
+				Render("⚽ Goals")
+			content.WriteString(goalsTitle)
+			content.WriteString("\n")
+
+			for _, goal := range goals {
+				player := "Unknown"
+				if goal.Player != nil {
+					player = *goal.Player
+				}
+				teamName := goal.Team.ShortName
+				assistText := ""
+				if goal.Assist != nil && *goal.Assist != "" {
+					assistText = fmt.Sprintf(" (assist: %s)", *goal.Assist)
+				}
+				goalLine := fmt.Sprintf("%d' %s - %s%s", goal.Minute, teamName, player, assistText)
+				content.WriteString(infoStyle.Render(goalLine))
+				content.WriteString("\n")
+			}
+			content.WriteString("\n")
+		}
+
+		// Cards section
+		homeYellow := 0
+		homeRed := 0
+		awayYellow := 0
+		awayRed := 0
+		for _, event := range details.Events {
+			if event.Type == "card" {
+				isHome := event.Team.ID == details.HomeTeam.ID
+				if event.EventType != nil {
+					if *event.EventType == "yellow" {
+						if isHome {
+							homeYellow++
+						} else {
+							awayYellow++
+						}
+					} else if *event.EventType == "red" {
+						if isHome {
+							homeRed++
+						} else {
+							awayRed++
+						}
+					}
+				}
+			}
+		}
+
+		if homeYellow > 0 || homeRed > 0 || awayYellow > 0 || awayRed > 0 {
+			cardsTitle := lipgloss.NewStyle().
+				Foreground(accentColor).
+				Bold(true).
+				PaddingTop(0).
+				BorderBottom(true).
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderForeground(borderColor).
+				Width(width - 6).
+				Render("🟨🟥 Cards")
+			content.WriteString(cardsTitle)
+			content.WriteString("\n")
+
+			homeCards := make([]string, 0)
+			if homeYellow > 0 {
+				homeCards = append(homeCards, fmt.Sprintf("%d🟨", homeYellow))
+			}
+			if homeRed > 0 {
+				homeCards = append(homeCards, fmt.Sprintf("%d🟥", homeRed))
+			}
+			awayCards := make([]string, 0)
+			if awayYellow > 0 {
+				awayCards = append(awayCards, fmt.Sprintf("%d🟨", awayYellow))
+			}
+			if awayRed > 0 {
+				awayCards = append(awayCards, fmt.Sprintf("%d🟥", awayRed))
+			}
+
+			if len(homeCards) > 0 || len(awayCards) > 0 {
+				cardsLine := fmt.Sprintf("%s: %s | %s: %s",
+					details.HomeTeam.ShortName, strings.Join(homeCards, " "),
+					details.AwayTeam.ShortName, strings.Join(awayCards, " "))
+				content.WriteString(infoStyle.Render(cardsLine))
+				content.WriteString("\n\n")
+			}
+		}
+
+		// Match Events section (all events)
+		eventsTitle := lipgloss.NewStyle().
+			Foreground(accentColor).
+			Bold(true).
+			PaddingTop(0).
+			BorderBottom(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(borderColor).
+			Width(width - 6).
+			Render("📋 All Events")
+		content.WriteString(eventsTitle)
+		content.WriteString("\n")
+
+		// Display match events (goals, cards, substitutions)
+		if len(details.Events) == 0 {
+			emptyEvents := lipgloss.NewStyle().
+				Foreground(dimColor).
+				Padding(0, 0).
+				Render("No events recorded")
+			content.WriteString(emptyEvents)
+		} else {
+			// Show events in chronological order (oldest first)
+			eventsList := make([]string, 0, len(details.Events))
+			for _, event := range details.Events {
+				eventLine := formatMatchEventForDisplay(event, details.HomeTeam.ShortName, details.AwayTeam.ShortName)
+				eventsList = append(eventsList, eventLine)
+			}
+			content.WriteString(strings.Join(eventsList, "\n"))
+		}
+	} else {
+		// Live Updates section for live/upcoming matches
+		updatesTitle := lipgloss.NewStyle().
+			Foreground(accentColor).
+			Bold(true).
+			PaddingTop(0).
+			BorderBottom(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(borderColor).
+			Width(width - 6).
+			Render(constants.PanelUpdates)
+		content.WriteString(updatesTitle)
+		content.WriteString("\n")
+
+		// Show spinner if loading
+		if loading {
+			spinnerText := spinnerStyle.Render(sp.View() + " " + constants.LoadingFetching)
+			content.WriteString(spinnerText)
+			content.WriteString("\n")
+		}
+
+		// Display live updates (newest first)
+		if len(liveUpdates) == 0 && !loading {
+			emptyUpdates := lipgloss.NewStyle().
+				Foreground(dimColor).
+				Padding(0, 0).
+				Render(constants.EmptyNoUpdates)
+			content.WriteString(emptyUpdates)
+		} else if len(liveUpdates) > 0 {
+			// Show updates in reverse order (newest at top)
+			updatesList := make([]string, 0, len(liveUpdates))
+			for i := len(liveUpdates) - 1; i >= 0; i-- {
+				updateLine := liveUpdateStyle.Render(liveUpdates[i])
+				updatesList = append(updatesList, updateLine)
+			}
+			content.WriteString(strings.Join(updatesList, "\n"))
+		}
 	}
 
 	// Combine title and content (only include title if showTitle is true)
@@ -436,4 +604,77 @@ func renderEvent(event api.MatchEvent, width int) string {
 	}
 
 	return line
+}
+
+// formatMatchEventForDisplay formats a match event for display in the stats view
+func formatMatchEventForDisplay(event api.MatchEvent, homeTeam, awayTeam string) string {
+	minuteStr := fmt.Sprintf("%d'", event.Minute)
+	minuteStyle := eventMinuteStyle.Render(minuteStr)
+
+	var eventText string
+	switch event.Type {
+	case "goal":
+		teamName := homeTeam
+		if event.Team.ShortName != homeTeam {
+			teamName = awayTeam
+		}
+		playerName := "Unknown"
+		if event.Player != nil {
+			playerName = *event.Player
+		}
+		assistText := ""
+		if event.Assist != nil && *event.Assist != "" {
+			assistText = fmt.Sprintf(" (assist: %s)", *event.Assist)
+		}
+		eventText = eventGoalStyle.Render(fmt.Sprintf("⚽ %s - %s%s", teamName, playerName, assistText))
+	case "card":
+		teamName := homeTeam
+		if event.Team.ShortName != homeTeam {
+			teamName = awayTeam
+		}
+		playerName := "Unknown"
+		if event.Player != nil {
+			playerName = *event.Player
+		}
+		cardType := "yellow"
+		if event.EventType != nil {
+			cardType = *event.EventType
+		}
+		cardEmoji := "🟨"
+		if cardType == "red" {
+			cardEmoji = "🟥"
+		}
+		eventText = eventCardStyle.Render(fmt.Sprintf("%s %s - %s", cardEmoji, teamName, playerName))
+	case "substitution":
+		teamName := homeTeam
+		if event.Team.ShortName != homeTeam {
+			teamName = awayTeam
+		}
+		playerName := "Unknown"
+		if event.Player != nil {
+			playerName = *event.Player
+		}
+		eventText = eventTextStyle.Render(fmt.Sprintf("🔄 %s - %s", teamName, playerName))
+	default:
+		teamName := homeTeam
+		if event.Team.ShortName != homeTeam {
+			teamName = awayTeam
+		}
+		playerName := ""
+		if event.Player != nil {
+			playerName = *event.Player
+		}
+		if playerName != "" {
+			eventText = eventTextStyle.Render(fmt.Sprintf("%s - %s", teamName, playerName))
+		} else {
+			eventText = eventTextStyle.Render(teamName)
+		}
+	}
+
+	return lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		minuteStyle,
+		" ",
+		eventText,
+	)
 }
