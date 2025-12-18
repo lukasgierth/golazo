@@ -8,112 +8,92 @@ import (
 	"github.com/0xjuanma/golazo/internal/api"
 )
 
-// FinishedMatchesByDateRange retrieves finished matches within a date range.
-// This is used for the stats view to show completed matches.
-// Queries each date individually and aggregates results, as FotMob doesn't support date range queries.
-func (c *Client) FinishedMatchesByDateRange(ctx context.Context, dateFrom, dateTo time.Time) ([]api.Match, error) {
-	var allMatches []api.Match
+// StatsData holds all matches data for the stats view.
+// This is returned by FetchStatsData and contains both finished and upcoming matches.
+type StatsData struct {
+	// AllFinished contains finished matches for all fetched days (5 days by default)
+	AllFinished []api.Match
+	// TodayFinished contains only today's finished matches (filtered from AllFinished)
+	TodayFinished []api.Match
+	// TodayUpcoming contains today's upcoming matches
+	TodayUpcoming []api.Match
+}
 
-	// Normalize dates to UTC to avoid timezone issues
-	currentDate := dateFrom.UTC()
-	dateToUTC := dateTo.UTC()
+// StatsDataDays is the number of days to fetch for stats view.
+// 5 days ensures we have data even during mid-week breaks.
+const StatsDataDays = 5
+
+// FetchStatsData fetches all stats data in one call: 5 days of finished matches + today's upcoming.
+// This is the primary API for the stats view - always fetches 5 days, then filters client-side.
+//
+// OPTIMIZATION: Only queries "fixtures" tab for today (upcoming matches).
+// Past days only need "results" tab (finished matches).
+//
+// API calls breakdown:
+//   - Today: 14 leagues × 2 tabs = 28 requests (need both fixtures + results)
+//   - Past 4 days: 14 leagues × 1 tab × 4 = 56 requests (only results)
+//   - Total: 84 requests
+//
+// Benefits:
+// - Single fetch pattern (always 5 days)
+// - Covers mid-week breaks when no matches scheduled
+// - Instant switching between Today/5d views after initial load
+func (c *Client) FetchStatsData(ctx context.Context) (*StatsData, error) {
+	today := time.Now().UTC()
+	todayStr := today.Format("2006-01-02")
+
+	var allFinished []api.Match
+	var todayFinished []api.Match
+	var todayUpcoming []api.Match
 	var lastErr error
 	successCount := 0
-	totalDates := 0
 
-	for !currentDate.After(dateToUTC) {
-		totalDates++
-		dateStr := currentDate.Format("2006-01-02")
+	// Fetch 5 days of matches (today + last 4 days)
+	for i := 0; i < StatsDataDays; i++ {
+		date := today.AddDate(0, 0, -i)
+		dateStr := date.Format("2006-01-02")
+		isToday := dateStr == todayStr
 
-		// Query matches for this date using MatchesByDate
-		matches, err := c.MatchesByDate(ctx, currentDate)
+		var matches []api.Match
+		var err error
+
+		if isToday {
+			// Today: need both fixtures (upcoming) and results (finished)
+			matches, err = c.MatchesByDateWithTabs(ctx, date, []string{"fixtures", "results"})
+		} else {
+			// Past days: only need results (finished matches)
+			matches, err = c.MatchesByDateWithTabs(ctx, date, []string{"results"})
+		}
+
 		if err != nil {
 			lastErr = fmt.Errorf("fetch matches for date %s: %w", dateStr, err)
-			currentDate = currentDate.AddDate(0, 0, 1)
 			continue
 		}
-
 		successCount++
-		// Filter for finished matches only
+
+		// Process matches for this day
 		for _, match := range matches {
 			if match.Status == api.MatchStatusFinished {
-				allMatches = append(allMatches, match)
+				allFinished = append(allFinished, match)
+				// Also track today's finished separately
+				if isToday {
+					todayFinished = append(todayFinished, match)
+				}
+			} else if match.Status == api.MatchStatusNotStarted && isToday {
+				// Only today has upcoming matches
+				todayUpcoming = append(todayUpcoming, match)
 			}
 		}
-
-		// Move to next day
-		currentDate = currentDate.AddDate(0, 0, 1)
 	}
 
-	// Return error if all dates failed, but allow partial results
-	if successCount == 0 && totalDates > 0 {
-		return allMatches, fmt.Errorf("failed to fetch matches for any date in range %s to %s: %w", dateFrom.Format("2006-01-02"), dateTo.Format("2006-01-02"), lastErr)
+	// Return error only if all days failed
+	if successCount == 0 {
+		return nil, fmt.Errorf("failed to fetch matches for any date: %w", lastErr)
 	}
 
-	return allMatches, nil
-}
-
-// RecentFinishedMatches retrieves finished matches from the last N days.
-// Queries from today going back N-1 days (inclusive).
-// Uses UTC timezone to ensure consistent date calculations.
-func (c *Client) RecentFinishedMatches(ctx context.Context, days int) ([]api.Match, error) {
-	if days <= 0 {
-		days = 1 // Default to 1 day if invalid
-	}
-	// Use UTC to avoid timezone issues
-	today := time.Now().UTC()
-	dateFrom := today.AddDate(0, 0, -(days - 1)) // Go back (days-1) days to include today
-	return c.FinishedMatchesByDateRange(ctx, dateFrom, today)
-}
-
-// UpcomingMatches retrieves upcoming (not started) matches for today.
-// This is used for the stats view when 1-day period is selected.
-// Only fetches matches that haven't started yet.
-func (c *Client) UpcomingMatches(ctx context.Context) ([]api.Match, error) {
-	today := time.Now().UTC()
-	dateStr := today.Format("2006-01-02")
-
-	// Query all matches for today using MatchesByDate
-	matches, err := c.MatchesByDate(ctx, today)
-	if err != nil {
-		return nil, fmt.Errorf("fetch matches for date %s: %w", dateStr, err)
-	}
-
-	// Filter for upcoming matches (not started and not finished)
-	var upcomingMatches []api.Match
-	for _, match := range matches {
-		// Include matches that are not started and not finished
-		if match.Status == api.MatchStatusNotStarted {
-			upcomingMatches = append(upcomingMatches, match)
-		}
-	}
-
-	return upcomingMatches, nil
-}
-
-// MatchesForToday retrieves both finished and upcoming matches for today in a single call.
-// This is optimized for 1-day stats view to avoid duplicate API calls.
-// Returns finished matches and upcoming matches separately.
-func (c *Client) MatchesForToday(ctx context.Context) (finished []api.Match, upcoming []api.Match, err error) {
-	today := time.Now().UTC()
-	dateStr := today.Format("2006-01-02")
-
-	// Query all matches for today using MatchesByDate (single API call)
-	matches, err := c.MatchesByDate(ctx, today)
-	if err != nil {
-		return nil, nil, fmt.Errorf("fetch matches for date %s: %w", dateStr, err)
-	}
-
-	// Split matches into finished and upcoming
-	var finishedMatches []api.Match
-	var upcomingMatches []api.Match
-	for _, match := range matches {
-		if match.Status == api.MatchStatusFinished {
-			finishedMatches = append(finishedMatches, match)
-		} else if match.Status == api.MatchStatusNotStarted {
-			upcomingMatches = append(upcomingMatches, match)
-		}
-	}
-
-	return finishedMatches, upcomingMatches, nil
+	return &StatsData{
+		AllFinished:   allFinished,
+		TodayFinished: todayFinished,
+		TodayUpcoming: todayUpcoming,
+	}, nil
 }

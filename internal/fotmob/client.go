@@ -98,12 +98,22 @@ func (c *Client) GetCache() *ResponseCache {
 // All requests are made concurrently with minimal rate limiting for maximum speed.
 // Results are cached to avoid redundant API calls.
 func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match, error) {
+	return c.MatchesByDateWithTabs(ctx, date, []string{"fixtures", "results"})
+}
+
+// MatchesByDateWithTabs retrieves matches for a specific date, querying only specified tabs.
+// tabs can be: ["fixtures"], ["results"], or ["fixtures", "results"]
+// This allows optimizing API calls - e.g., only query "results" for past days.
+// Results are cached per date (cache key includes all tabs for that date).
+func (c *Client) MatchesByDateWithTabs(ctx context.Context, date time.Time, tabs []string) ([]api.Match, error) {
 	// Normalize date to UTC for consistent comparison
 	requestDateStr := date.UTC().Format("2006-01-02")
 
-	// Check cache first
-	if cached := c.cache.GetMatches(requestDateStr); cached != nil {
-		return cached, nil
+	// Check cache first (only if querying both tabs - full cache)
+	if len(tabs) == 2 {
+		if cached := c.cache.GetMatches(requestDateStr); cached != nil {
+			return cached, nil
+		}
 	}
 
 	// Use a mutex to protect the shared slice
@@ -115,8 +125,7 @@ func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match
 	// This allows partial results even if some leagues are unavailable
 	var wg sync.WaitGroup
 
-	// Query both fixtures (upcoming) and results (finished) tabs
-	tabs := []string{"fixtures", "results"}
+	// Query specified tabs
 	for _, tab := range tabs {
 		for _, leagueID := range SupportedLeagues {
 			wg.Add(1)
