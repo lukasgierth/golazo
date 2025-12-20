@@ -168,13 +168,12 @@ func (m model) handleMatchDetails(msg matchDetailsMsg) (tea.Model, tea.Cmd) {
 
 		// Continue polling if match is live
 		if msg.details.Status == api.MatchStatusLive {
-			// Mark poll data as received
-			m.pollDataReceived = true
-
-			// Only hide spinner if both data received and display time elapsed
-			if m.pollDataReceived && m.pollDisplayElapsed {
+			// For initial load, clear loading state
+			// For poll refresh, loading is cleared by 0.5s timer (pollDisplayCompleteMsg)
+			if !m.polling {
 				m.loading = false
 			}
+			// Note: if m.polling is true, m.loading stays true until the 0.5s timer fires
 
 			m.polling = true
 			// Schedule next poll tick (90 seconds from now)
@@ -709,7 +708,7 @@ func (m model) handleMainViewCheck(msg mainViewCheckMsg) (tea.Model, tea.Cmd) {
 }
 
 // handlePollTick handles the 90-second poll tick.
-// Sets loading state and triggers the actual API call.
+// Shows "Updating..." spinner for 0.5s as visual feedback, then fetches data.
 func (m model) handlePollTick(msg pollTickMsg) (tea.Model, tea.Cmd) {
 	// Only process if we're still in live view and polling is active
 	if m.currentView != viewLiveMatches || !m.polling {
@@ -723,27 +722,19 @@ func (m model) handlePollTick(msg pollTickMsg) (tea.Model, tea.Cmd) {
 
 	// Set loading state to show "Updating..." spinner
 	m.loading = true
-	m.pollDataReceived = false
-	m.pollDisplayElapsed = false
 
-	// Start the actual API call, spinner animation, and minimum display timer
+	// Start the actual API call, spinner animation, and 0.5s display timer
 	return m, tea.Batch(
 		fetchPollMatchDetails(m.fotmobClient, msg.matchID, m.useMockData),
 		ui.SpinnerTick(),
-		scheduleMinDisplayTime(), // Ensure spinner shows for at least 1 second
+		schedulePollSpinnerHide(), // Hide spinner after 0.5 seconds
 	)
 }
 
-// handlePollDisplayComplete handles the minimum display time elapsed.
-// Hides the spinner only if both data received and display time elapsed.
+// handlePollDisplayComplete hides the spinner after 0.5s display time.
 func (m model) handlePollDisplayComplete() (tea.Model, tea.Cmd) {
-	m.pollDisplayElapsed = true
-
-	// Only hide spinner if both conditions are met
-	if m.pollDataReceived && m.pollDisplayElapsed {
-		m.loading = false
-	}
-
+	// Hide spinner - the 0.5s visual feedback is complete
+	m.loading = false
 	return m, nil
 }
 

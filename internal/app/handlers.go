@@ -144,6 +144,7 @@ func (m model) loadMatchDetails(matchID int) (tea.Model, tea.Cmd) {
 	m.lastEvents = nil
 	m.loading = true
 	m.liveViewLoading = true
+	m.polling = false // Reset polling state - this is a new match load, not a poll refresh
 	return m, tea.Batch(m.spinner.Tick, ui.SpinnerTick(), fetchMatchDetails(m.fotmobClient, matchID, m.useMockData))
 }
 

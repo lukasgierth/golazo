@@ -168,12 +168,12 @@ func schedulePollTick(matchID int) tea.Cmd {
 	})
 }
 
-// MinPollDisplayTime is the minimum time to show the "Updating..." spinner.
-const MinPollDisplayTime = 1 * time.Second
+// PollSpinnerDuration is how long to show the "Updating..." spinner.
+const PollSpinnerDuration = 500 * time.Millisecond
 
-// scheduleMinDisplayTime schedules a message after the minimum display time.
-func scheduleMinDisplayTime() tea.Cmd {
-	return tea.Tick(MinPollDisplayTime, func(t time.Time) tea.Msg {
+// schedulePollSpinnerHide schedules hiding the spinner after the display duration.
+func schedulePollSpinnerHide() tea.Cmd {
+	return tea.Tick(PollSpinnerDuration, func(t time.Time) tea.Msg {
 		return pollDisplayCompleteMsg{}
 	})
 }
