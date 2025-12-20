@@ -1,6 +1,9 @@
 package app
 
-import "github.com/0xjuanma/golazo/internal/api"
+import (
+	"github.com/0xjuanma/golazo/internal/api"
+	"github.com/0xjuanma/golazo/internal/fotmob"
+)
 
 // liveUpdateMsg contains a live update string for match events.
 type liveUpdateMsg struct {
@@ -17,13 +20,31 @@ type liveMatchesMsg struct {
 	matches []api.Match
 }
 
-// finishedMatchesMsg contains finished matches from API response.
-type finishedMatchesMsg struct {
+// liveRefreshMsg is sent when live matches are refreshed (periodic 5-min timer).
+type liveRefreshMsg struct {
 	matches []api.Match
 }
 
-// upcomingMatchesMsg contains upcoming matches from API response.
-type upcomingMatchesMsg struct {
-	matches []api.Match
+// liveBatchDataMsg contains live matches for a batch of leagues (parallel loading).
+// Sent when a batch of leagues completes, allowing progressive UI updates.
+type liveBatchDataMsg struct {
+	batchIndex int         // Which batch (0, 1, 2, ...)
+	isLast     bool        // true if this is the last batch
+	matches    []api.Match // live matches from all leagues in this batch
 }
 
+// statsDataMsg contains all stats data (5 days finished + today upcoming) from API response.
+// This is the unified message for stats view - always fetches 5 days, filters client-side.
+type statsDataMsg struct {
+	data *fotmob.StatsData
+}
+
+// statsDayDataMsg contains stats data for a single day (progressive loading).
+// Sent as each day's API calls complete, allowing immediate UI updates.
+type statsDayDataMsg struct {
+	dayIndex int         // 0 = today, 1 = yesterday, etc.
+	isToday  bool        // true if this is today's data
+	isLast   bool        // true if this is the last day to fetch
+	finished []api.Match // finished matches for this day
+	upcoming []api.Match // upcoming matches (only for today)
+}

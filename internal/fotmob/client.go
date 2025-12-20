@@ -70,12 +70,21 @@ type Client struct {
 	baseURL     string
 	rateLimiter *RateLimiter
 	cache       *ResponseCache
+	emptyCache  *EmptyResultsCache // Persistent cache for empty league+date combinations
 }
 
 // NewClient creates a new FotMob API client with default configuration.
 // Includes minimal rate limiting (200ms between requests) for fast concurrent requests.
 // Uses default caching configuration for improved performance.
+// Initializes persistent empty results cache to skip known empty league+date combinations.
 func NewClient() *Client {
+	// Initialize empty results cache (logs error but doesn't fail)
+	emptyCache, err := NewEmptyResultsCache()
+	if err != nil {
+		// If we can't create the cache, create client without it
+		emptyCache = nil
+	}
+
 	return &Client{
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
@@ -83,12 +92,30 @@ func NewClient() *Client {
 		baseURL:     baseURL,
 		rateLimiter: NewRateLimiter(200 * time.Millisecond), // Minimal delay for concurrent requests
 		cache:       NewResponseCache(DefaultCacheConfig()),
+		emptyCache:  emptyCache,
 	}
 }
 
 // GetCache returns the response cache for external access (e.g., pre-fetching).
 func (c *Client) GetCache() *ResponseCache {
 	return c.cache
+}
+
+// SaveEmptyCache persists the empty results cache to disk.
+// Should be called periodically or when the application exits.
+func (c *Client) SaveEmptyCache() error {
+	if c.emptyCache == nil {
+		return nil
+	}
+	return c.emptyCache.Save()
+}
+
+// GetEmptyCacheStats returns statistics about the empty results cache.
+func (c *Client) GetEmptyCacheStats() (total int, expired int) {
+	if c.emptyCache == nil {
+		return 0, 0
+	}
+	return c.emptyCache.Stats()
 }
 
 // MatchesByDate retrieves all matches for a specific date.
@@ -98,12 +125,22 @@ func (c *Client) GetCache() *ResponseCache {
 // All requests are made concurrently with minimal rate limiting for maximum speed.
 // Results are cached to avoid redundant API calls.
 func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match, error) {
+	return c.MatchesByDateWithTabs(ctx, date, []string{"fixtures", "results"})
+}
+
+// MatchesByDateWithTabs retrieves matches for a specific date, querying only specified tabs.
+// tabs can be: ["fixtures"], ["results"], or ["fixtures", "results"]
+// This allows optimizing API calls - e.g., only query "results" for past days.
+// Results are cached per date (cache key includes all tabs for that date).
+func (c *Client) MatchesByDateWithTabs(ctx context.Context, date time.Time, tabs []string) ([]api.Match, error) {
 	// Normalize date to UTC for consistent comparison
 	requestDateStr := date.UTC().Format("2006-01-02")
 
-	// Check cache first
-	if cached := c.cache.GetMatches(requestDateStr); cached != nil {
-		return cached, nil
+	// Check cache first (only if querying both tabs - full cache)
+	if len(tabs) == 2 {
+		if cached := c.cache.GetMatches(requestDateStr); cached != nil {
+			return cached, nil
+		}
 	}
 
 	// Use a mutex to protect the shared slice
@@ -115,10 +152,19 @@ func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match
 	// This allows partial results even if some leagues are unavailable
 	var wg sync.WaitGroup
 
-	// Query both fixtures (upcoming) and results (finished) tabs
-	tabs := []string{"fixtures", "results"}
+	// Track skipped leagues for logging/debugging
+	var skippedFromCache int
+
+	// Query specified tabs
 	for _, tab := range tabs {
 		for _, leagueID := range SupportedLeagues {
+			// Check empty cache before spawning goroutine (for "results" tab only)
+			// Skip leagues known to have no matches on this date
+			if tab == "results" && c.emptyCache != nil && c.emptyCache.IsEmpty(requestDateStr, leagueID) {
+				skippedFromCache++
+				continue
+			}
+
 			wg.Add(1)
 			go func(id int, tabName string) {
 				defer wg.Done()
@@ -193,6 +239,12 @@ func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match
 					}
 				}
 
+				// Mark league+date as empty if no matches found (for results tab only)
+				// This will be persisted to avoid future API calls
+				if len(leagueMatches) == 0 && tabName == "results" && c.emptyCache != nil {
+					c.emptyCache.MarkEmpty(requestDateStr, id)
+				}
+
 				// Append to shared slice with mutex protection
 				mu.Lock()
 				allMatches = append(allMatches, leagueMatches...)
@@ -201,12 +253,87 @@ func (c *Client) MatchesByDate(ctx context.Context, date time.Time) ([]api.Match
 		}
 	}
 
+	// Variable is used below (prevents unused variable error)
+	_ = skippedFromCache
+
 	wg.Wait()
 
 	// Cache the results before returning
 	c.cache.SetMatches(requestDateStr, allMatches)
 
+	// Persist empty results cache to disk (async, best-effort)
+	go c.SaveEmptyCache()
+
 	return allMatches, nil
+}
+
+// MatchesForLeagueAndDate fetches matches for a single league on a specific date.
+// Used for progressive loading - allows fetching one league at a time.
+func (c *Client) MatchesForLeagueAndDate(ctx context.Context, leagueID int, date time.Time, tab string) ([]api.Match, error) {
+	requestDateStr := date.UTC().Format("2006-01-02")
+
+	// Apply rate limiting
+	c.rateLimiter.Wait()
+
+	url := fmt.Sprintf("%s/leagues?id=%d&tab=%s", c.baseURL, leagueID, tab)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request for league %d: %w", leagueID, err)
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch league %d: %w", leagueID, err)
+	}
+	defer resp.Body.Close()
+
+	var leagueResponse struct {
+		Details struct {
+			ID          int    `json:"id"`
+			Name        string `json:"name"`
+			Country     string `json:"country"`
+			CountryCode string `json:"countryCode,omitempty"`
+		} `json:"details"`
+		Fixtures struct {
+			AllMatches []fotmobMatch `json:"allMatches"`
+		} `json:"fixtures"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&leagueResponse); err != nil {
+		return nil, fmt.Errorf("decode league %d response: %w", leagueID, err)
+	}
+
+	// Filter matches for the requested date
+	var matches []api.Match
+	for _, m := range leagueResponse.Fixtures.AllMatches {
+		if m.Status.UTCTime != "" {
+			var matchTime time.Time
+			var parseErr error
+			matchTime, parseErr = time.Parse(time.RFC3339, m.Status.UTCTime)
+			if parseErr != nil {
+				matchTime, parseErr = time.Parse("2006-01-02T15:04:05.000Z", m.Status.UTCTime)
+			}
+			if parseErr == nil {
+				matchDateStr := matchTime.UTC().Format("2006-01-02")
+				if matchDateStr == requestDateStr {
+					if m.League.ID == 0 {
+						m.League = league{
+							ID:          leagueResponse.Details.ID,
+							Name:        leagueResponse.Details.Name,
+							Country:     leagueResponse.Details.Country,
+							CountryCode: leagueResponse.Details.CountryCode,
+						}
+					}
+					matches = append(matches, m.toAPIMatch())
+				}
+			}
+		}
+	}
+
+	return matches, nil
 }
 
 // MatchDetails retrieves detailed information about a specific match.

@@ -9,19 +9,21 @@ import (
 
 // CacheConfig holds configuration for API response caching.
 type CacheConfig struct {
-	MatchesTTL       time.Duration // How long to cache match list results
-	MatchDetailsTTL  time.Duration // How long to cache match details
-	MaxMatchesCache  int           // Maximum number of date entries to cache
-	MaxDetailsCache  int           // Maximum number of match details to cache
+	MatchesTTL      time.Duration // How long to cache match list results
+	MatchDetailsTTL time.Duration // How long to cache match details
+	LiveMatchesTTL  time.Duration // How long to cache live matches list
+	MaxMatchesCache int           // Maximum number of date entries to cache
+	MaxDetailsCache int           // Maximum number of match details to cache
 }
 
 // DefaultCacheConfig returns sensible defaults for caching.
 func DefaultCacheConfig() CacheConfig {
 	return CacheConfig{
-		MatchesTTL:       5 * time.Minute,  // Matches can change (scores update)
-		MatchDetailsTTL:  2 * time.Minute,  // Details for live matches need fresher data
-		MaxMatchesCache:  10,               // Cache up to 10 date queries
-		MaxDetailsCache:  100,              // Cache up to 100 match details
+		MatchesTTL:      15 * time.Minute, // Matches list cache (stats view uses client-side filtering)
+		MatchDetailsTTL: 5 * time.Minute,  // Details for live matches need fresher data
+		LiveMatchesTTL:  2 * time.Minute,  // Live matches list cache (quick nav doesn't re-fetch)
+		MaxMatchesCache: 10,               // Cache up to 10 date queries
+		MaxDetailsCache: 100,              // Cache up to 100 match details
 	}
 }
 
@@ -39,11 +41,13 @@ type cachedDetails struct {
 
 // ResponseCache provides thread-safe caching for API responses.
 type ResponseCache struct {
-	config         CacheConfig
-	matchesMu      sync.RWMutex
-	matchesCache   map[string]cachedMatches // key: "YYYY-MM-DD"
-	detailsMu      sync.RWMutex
-	detailsCache   map[int]cachedDetails    // key: matchID
+	config       CacheConfig
+	matchesMu    sync.RWMutex
+	matchesCache map[string]cachedMatches // key: "YYYY-MM-DD"
+	detailsMu    sync.RWMutex
+	detailsCache map[int]cachedDetails // key: matchID
+	liveMu       sync.RWMutex
+	liveCache    *cachedMatches // Single cache entry for live matches
 }
 
 // NewResponseCache creates a new cache with the given configuration.
@@ -52,6 +56,7 @@ func NewResponseCache(config CacheConfig) *ResponseCache {
 		config:       config,
 		matchesCache: make(map[string]cachedMatches),
 		detailsCache: make(map[int]cachedDetails),
+		liveCache:    nil,
 	}
 }
 
@@ -137,6 +142,36 @@ func (c *ResponseCache) ClearDetailsCache() {
 	c.detailsCache = make(map[int]cachedDetails)
 }
 
+// GetLiveMatches retrieves cached live matches, returns nil if not cached or expired.
+func (c *ResponseCache) GetLiveMatches() []api.Match {
+	c.liveMu.RLock()
+	defer c.liveMu.RUnlock()
+
+	if c.liveCache == nil || time.Now().After(c.liveCache.expiresAt) {
+		return nil
+	}
+	return c.liveCache.matches
+}
+
+// SetLiveMatches stores live matches in cache with TTL.
+func (c *ResponseCache) SetLiveMatches(matches []api.Match) {
+	c.liveMu.Lock()
+	defer c.liveMu.Unlock()
+
+	c.liveCache = &cachedMatches{
+		matches:   matches,
+		expiresAt: time.Now().Add(c.config.LiveMatchesTTL),
+	}
+}
+
+// ClearLiveCache invalidates the live matches cache.
+// Call this to force a refresh on next fetch.
+func (c *ResponseCache) ClearLiveCache() {
+	c.liveMu.Lock()
+	defer c.liveMu.Unlock()
+	c.liveCache = nil
+}
+
 // evictOldestMatches removes expired or oldest entries (must hold write lock).
 func (c *ResponseCache) evictOldestMatches() {
 	now := time.Now()
@@ -190,4 +225,3 @@ func (c *ResponseCache) evictOldestDetails() {
 		delete(c.detailsCache, oldestKey)
 	}
 }
-

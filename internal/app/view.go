@@ -19,6 +19,8 @@ func (m model) View() string {
 			m.loading,
 			m.randomSpinner,
 			m.liveViewLoading,
+			m.liveBatchesLoaded,
+			m.liveTotalBatches,
 		)
 
 	case viewStats:
@@ -32,6 +34,8 @@ func (m model) View() string {
 			spinner,
 			m.statsViewLoading,
 			m.statsDateRange,
+			m.statsDaysLoaded,
+			m.statsTotalDays,
 		)
 
 	default:
@@ -99,4 +103,3 @@ func (m *model) ensureStatsSpinner() *ui.RandomCharSpinner {
 	}
 	return m.statsViewSpinner
 }
-

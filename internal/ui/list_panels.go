@@ -101,7 +101,7 @@ func RenderStatsListPanel(width, height int, finishedList list.Model, upcomingLi
 	return panel
 }
 
-// renderDateRangeSelector renders a horizontal date range selector (Today, 3d).
+// renderDateRangeSelector renders a horizontal date range selector (Today, 3d, 5d).
 func renderDateRangeSelector(width int, selected int) string {
 	options := []struct {
 		days  int
@@ -109,6 +109,7 @@ func renderDateRangeSelector(width int, selected int) string {
 	}{
 		{1, "Today"},
 		{3, "3d"},
+		{5, "5d"},
 	}
 
 	items := make([]string, 0, len(options))
@@ -138,7 +139,8 @@ func renderDateRangeSelector(width int, selected int) string {
 }
 
 // RenderMultiPanelViewWithList renders the live matches view with list component.
-func RenderMultiPanelViewWithList(width, height int, listModel list.Model, details *api.MatchDetails, liveUpdates []string, sp spinner.Model, loading bool, randomSpinner *RandomCharSpinner, viewLoading bool) string {
+// leaguesLoaded and totalLeagues show loading progress during progressive loading.
+func RenderMultiPanelViewWithList(width, height int, listModel list.Model, details *api.MatchDetails, liveUpdates []string, sp spinner.Model, loading bool, randomSpinner *RandomCharSpinner, viewLoading bool, leaguesLoaded int, totalLeagues int) string {
 	// Handle edge case: if width/height not set, use defaults
 	if width <= 0 {
 		width = 80
@@ -158,6 +160,11 @@ func RenderMultiPanelViewWithList(width, height int, listModel list.Model, detai
 	var spinnerArea string
 	if viewLoading && randomSpinner != nil {
 		spinnerView := randomSpinner.View()
+		// Add progress indicator during progressive loading (batches of 4 leagues)
+		var progressText string
+		if totalLeagues > 0 && leaguesLoaded < totalLeagues {
+			progressText = fmt.Sprintf("  Scanning batch %d/%d...", leaguesLoaded+1, totalLeagues)
+		}
 		if spinnerView != "" {
 			// Center the spinner horizontally using style with width and alignment
 			spinnerStyle := lipgloss.NewStyle().
@@ -165,7 +172,7 @@ func RenderMultiPanelViewWithList(width, height int, listModel list.Model, detai
 				Height(spinnerHeight).
 				Align(lipgloss.Center).
 				AlignVertical(lipgloss.Center)
-			spinnerArea = spinnerStyle.Render(spinnerView)
+			spinnerArea = spinnerStyle.Render(spinnerView + progressText)
 		} else {
 			// Fallback if spinner view is empty
 			spinnerStyle := lipgloss.NewStyle().
@@ -173,7 +180,7 @@ func RenderMultiPanelViewWithList(width, height int, listModel list.Model, detai
 				Height(spinnerHeight).
 				Align(lipgloss.Center).
 				AlignVertical(lipgloss.Center)
-			spinnerArea = spinnerStyle.Render("Loading...")
+			spinnerArea = spinnerStyle.Render("Loading..." + progressText)
 		}
 	} else {
 		// Reserve space with empty lines - ensure it takes up exactly spinnerHeight lines
@@ -224,7 +231,8 @@ func RenderMultiPanelViewWithList(width, height int, listModel list.Model, detai
 
 // RenderStatsViewWithList renders the stats view with list component.
 // Rebuilt to match live view structure exactly: spinner at top, left panel (matches), right panel (details).
-func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomingList list.Model, details *api.MatchDetails, randomSpinner *RandomCharSpinner, viewLoading bool, dateRange int) string {
+// daysLoaded and totalDays show loading progress during progressive loading.
+func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomingList list.Model, details *api.MatchDetails, randomSpinner *RandomCharSpinner, viewLoading bool, dateRange int, daysLoaded int, totalDays int) string {
 	// Handle edge case: if width/height not set, use defaults
 	if width <= 0 {
 		width = 80
@@ -245,6 +253,11 @@ func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomin
 	var spinnerArea string
 	if viewLoading && randomSpinner != nil {
 		spinnerView := randomSpinner.View()
+		// Add progress indicator during progressive loading
+		var progressText string
+		if totalDays > 0 && daysLoaded < totalDays {
+			progressText = fmt.Sprintf("  Loading day %d/%d...", daysLoaded+1, totalDays)
+		}
 		if spinnerView != "" {
 			// Center the spinner horizontally using style with width and alignment
 			spinnerStyle := lipgloss.NewStyle().
@@ -252,7 +265,7 @@ func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomin
 				Height(spinnerHeight).
 				Align(lipgloss.Center).
 				AlignVertical(lipgloss.Center)
-			spinnerArea = spinnerStyle.Render(spinnerView)
+			spinnerArea = spinnerStyle.Render(spinnerView + progressText)
 		} else {
 			// Fallback if spinner view is empty
 			spinnerStyle := lipgloss.NewStyle().
@@ -260,7 +273,7 @@ func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomin
 				Height(spinnerHeight).
 				Align(lipgloss.Center).
 				AlignVertical(lipgloss.Center)
-			spinnerArea = spinnerStyle.Render("Loading...")
+			spinnerArea = spinnerStyle.Render("Loading..." + progressText)
 		}
 	} else {
 		// Reserve space with empty lines - ensure it takes up exactly spinnerHeight lines
