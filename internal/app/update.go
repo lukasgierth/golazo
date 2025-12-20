@@ -172,8 +172,10 @@ func (m model) handleMatchDetails(msg matchDetailsMsg) (tea.Model, tea.Cmd) {
 		// Continue polling if match is live
 		if msg.details.Status == api.MatchStatusLive {
 			m.polling = true
-			m.loading = true
+			m.loading = false // Not initial loading, just polling
 			cmds = append(cmds, pollMatchDetails(m.fotmobClient, m.parser, msg.details.ID, m.lastEvents, m.useMockData))
+			// Start spinner tick for polling animation
+			cmds = append(cmds, ui.SpinnerTick())
 		} else {
 			m.loading = false
 			m.polling = false
@@ -617,7 +619,7 @@ func filterMatchesByDays(matches []api.Match, days int) []api.Match {
 // Uses a SINGLE tick chain - all spinners share the same tick rate.
 func (m model) handleRandomSpinnerTick(msg ui.TickMsg) (tea.Model, tea.Cmd) {
 	// Check if any spinner needs to be animated
-	needsTick := m.mainViewLoading || m.liveViewLoading || m.statsViewLoading
+	needsTick := m.mainViewLoading || m.liveViewLoading || m.statsViewLoading || m.polling
 
 	if !needsTick {
 		// No spinners active - don't continue the tick chain
@@ -635,6 +637,11 @@ func (m model) handleRandomSpinnerTick(msg ui.TickMsg) (tea.Model, tea.Cmd) {
 
 	if m.statsViewLoading {
 		m.statsViewSpinner.Tick()
+	}
+
+	// Update polling spinner when polling is active
+	if m.polling && m.pollingSpinner != nil {
+		m.pollingSpinner.Tick()
 	}
 
 	// Return ONE tick command to continue the animation chain

@@ -54,6 +54,7 @@ type model struct {
 	spinner          spinner.Model
 	randomSpinner    *ui.RandomCharSpinner
 	statsViewSpinner *ui.RandomCharSpinner // Separate spinner for stats view
+	pollingSpinner   *ui.RandomCharSpinner // Small spinner for polling indicator
 
 	// List components
 	liveMatchesList     list.Model
@@ -91,6 +92,9 @@ func New(useMockData bool) model {
 	statsViewSpinner := ui.NewRandomCharSpinner()
 	statsViewSpinner.SetWidth(30)
 
+	pollingSpinner := ui.NewRandomCharSpinner()
+	pollingSpinner.SetWidth(10) // Small spinner for polling indicator
+
 	// Initialize list models with custom delegate
 	delegate := ui.NewMatchListDelegate()
 
@@ -118,6 +122,7 @@ func New(useMockData bool) model {
 		spinner:             s,
 		randomSpinner:       randomSpinner,
 		statsViewSpinner:    statsViewSpinner,
+		pollingSpinner:      pollingSpinner,
 		liveMatchesList:     liveList,
 		statsMatchesList:    statsList,
 		upcomingMatchesList: upcomingList,

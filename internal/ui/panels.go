@@ -238,12 +238,17 @@ func renderMatchListItem(match MatchDisplay, selected bool, width int) string {
 
 // renderMatchDetailsPanel renders the right panel with match details and live updates.
 func renderMatchDetailsPanel(width, height int, details *api.MatchDetails, liveUpdates []string, sp spinner.Model, loading bool) string {
-	return renderMatchDetailsPanelWithTitle(width, height, details, liveUpdates, sp, loading, true)
+	return renderMatchDetailsPanelFull(width, height, details, liveUpdates, sp, loading, true, nil, false)
 }
 
-// renderMatchDetailsPanelWithTitle renders the right panel with optional title.
+// renderMatchDetailsPanelWithPolling renders the right panel with polling spinner support.
+func renderMatchDetailsPanelWithPolling(width, height int, details *api.MatchDetails, liveUpdates []string, sp spinner.Model, loading bool, pollingSpinner *RandomCharSpinner, isPolling bool) string {
+	return renderMatchDetailsPanelFull(width, height, details, liveUpdates, sp, loading, true, pollingSpinner, isPolling)
+}
+
+// renderMatchDetailsPanelFull renders the right panel with optional title and polling spinner.
 // Uses Neon design with Golazo red/cyan theme.
-func renderMatchDetailsPanelWithTitle(width, height int, details *api.MatchDetails, liveUpdates []string, sp spinner.Model, loading bool, showTitle bool) string {
+func renderMatchDetailsPanelFull(width, height int, details *api.MatchDetails, liveUpdates []string, sp spinner.Model, loading bool, showTitle bool, pollingSpinner *RandomCharSpinner, isPolling bool) string {
 	// Neon color constants
 	neonRed := lipgloss.Color("196")
 	neonCyan := lipgloss.Color("51")
@@ -523,6 +528,13 @@ func renderMatchDetailsPanelWithTitle(width, height int, details *api.MatchDetai
 		}
 	} else {
 		// Live Updates section for live/upcoming matches with neon styling
+		// Build title with optional polling spinner on the right
+		titleText := constants.PanelUpdates
+		if isPolling && pollingSpinner != nil {
+			// Add polling spinner inline with title
+			pollingView := pollingSpinner.View()
+			titleText = titleText + "  " + pollingView
+		}
 		updatesTitle := lipgloss.NewStyle().
 			Foreground(neonCyan).
 			Bold(true).
@@ -531,12 +543,12 @@ func renderMatchDetailsPanelWithTitle(width, height int, details *api.MatchDetai
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("239")).
 			Width(width - 6).
-			Render(constants.PanelUpdates)
+			Render(titleText)
 		content.WriteString(updatesTitle)
 		content.WriteString("\n")
 
-		// Show spinner if loading
-		if loading {
+		// Show spinner if loading (initial fetch, not polling)
+		if loading && !isPolling {
 			spinnerText := spinnerStyle.Render(sp.View() + " " + constants.LoadingFetching)
 			content.WriteString(spinnerText)
 			content.WriteString("\n")
