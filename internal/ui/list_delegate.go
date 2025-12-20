@@ -6,8 +6,12 @@ import (
 )
 
 // NewMatchListDelegate creates a custom list delegate for match items.
+// Height is set to 3 to accommodate title + 2-line description (with KO time).
 func NewMatchListDelegate() list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
+
+	// Set height to 3 lines: title (1) + description with KO time (2)
+	d.SetHeight(3)
 
 	// Customize styles - use highlight color for selected items
 	d.Styles.SelectedTitle = d.Styles.SelectedTitle.
