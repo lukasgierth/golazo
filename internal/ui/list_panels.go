@@ -193,7 +193,7 @@ func RenderMultiPanelViewWithList(width, height int, listModel list.Model, detai
 	if leftWidth < 25 {
 		leftWidth = 25
 	}
-	rightWidth := width - leftWidth - 1
+	rightWidth := width - leftWidth - 1 // -1 for separator
 	if rightWidth < 35 {
 		rightWidth = 35
 		leftWidth = width - rightWidth - 1
@@ -286,7 +286,7 @@ func RenderStatsViewWithList(width, height int, finishedList list.Model, upcomin
 	if leftWidth < 25 {
 		leftWidth = 25
 	}
-	rightWidth := width - leftWidth - 1
+	rightWidth := width - leftWidth - 1 // -1 for separator
 	if rightWidth < 35 {
 		rightWidth = 35
 		leftWidth = width - rightWidth - 1

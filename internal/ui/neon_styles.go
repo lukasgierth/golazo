@@ -18,14 +18,12 @@ var (
 
 	// Neon panel style - thick red border
 	neonPanelStyle = lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder()).
+			Border(lipgloss.NormalBorder()).
 			BorderForeground(neonRed).
 			Padding(0, 1)
 
-	// Neon panel style - cyan variant
+	// Neon panel style - cyan variant (no border for right panels)
 	neonPanelCyanStyle = lipgloss.NewStyle().
-				Border(lipgloss.ThickBorder()).
-				BorderForeground(neonCyan).
 				Padding(0, 1)
 
 	// Neon panel title style - red accent

@@ -14,7 +14,7 @@ import (
 var (
 	// Panel styles - Neon design with thick red borders
 	panelStyle = lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder()).
+			Border(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("196")). // neon red
 			Padding(0, 1)
 
@@ -93,7 +93,7 @@ func RenderMultiPanelView(width, height int, matches []MatchDisplay, selected in
 	if leftWidth < 25 {
 		leftWidth = 25 // Minimum width
 	}
-	rightWidth := width - leftWidth - 1 // -1 for border separator
+	rightWidth := width - leftWidth - 1 // -1 for separator
 	if rightWidth < 35 {
 		rightWidth = 35
 		leftWidth = width - rightWidth - 1
@@ -256,10 +256,8 @@ func renderMatchDetailsPanelFull(width, height int, details *api.MatchDetails, l
 	neonDim := lipgloss.Color("244")
 	neonWhite := lipgloss.Color("255")
 
-	// Use cyan border for details panel
+	// Details panel - no border, just padding for clean look
 	detailsPanelStyle := lipgloss.NewStyle().
-		Border(lipgloss.ThickBorder()).
-		BorderForeground(neonCyan).
 		Padding(0, 1)
 
 	if details == nil {
