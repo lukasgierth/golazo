@@ -17,6 +17,7 @@ const (
 	viewMain view = iota
 	viewLiveMatches
 	viewStats
+	viewSettings
 )
 
 // model holds the application state.
@@ -72,6 +73,9 @@ type model struct {
 	// Configuration
 	useMockData    bool
 	statsDateRange int // 1, 3, or 5 days (default: 1)
+
+	// Settings view state
+	settingsState *ui.SettingsState
 
 	// API clients
 	fotmobClient *fotmob.Client

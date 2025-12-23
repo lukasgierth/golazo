@@ -211,6 +211,8 @@ func (m model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleLiveMatchesSelection(msg)
 	case viewStats:
 		return m.handleStatsSelection(msg)
+	case viewSettings:
+		return m.handleSettingsViewKeys(msg)
 	}
 
 	return m, nil
