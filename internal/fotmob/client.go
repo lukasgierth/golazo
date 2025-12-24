@@ -59,8 +59,8 @@ func NewClient() *Client {
 	}
 }
 
-// GetCache returns the response cache for external access (e.g., pre-fetching).
-func (c *Client) GetCache() *ResponseCache {
+// Cache returns the response cache for external access (e.g., pre-fetching).
+func (c *Client) Cache() *ResponseCache {
 	return c.cache
 }
 
@@ -73,8 +73,8 @@ func (c *Client) SaveEmptyCache() error {
 	return c.emptyCache.Save()
 }
 
-// GetEmptyCacheStats returns statistics about the empty results cache.
-func (c *Client) GetEmptyCacheStats() (total int, expired int) {
+// EmptyCacheStats returns statistics about the empty results cache.
+func (c *Client) EmptyCacheStats() (total int, expired int) {
 	if c.emptyCache == nil {
 		return 0, 0
 	}
@@ -101,7 +101,7 @@ func (c *Client) MatchesByDateWithTabs(ctx context.Context, date time.Time, tabs
 
 	// Check cache first (only if querying both tabs - full cache)
 	if len(tabs) == 2 {
-		if cached := c.cache.GetMatches(requestDateStr); cached != nil {
+		if cached := c.cache.Matches(requestDateStr); cached != nil {
 			return cached, nil
 		}
 	}
@@ -306,7 +306,7 @@ func (c *Client) MatchesForLeagueAndDate(ctx context.Context, leagueID int, date
 // Results are cached to avoid redundant API calls.
 func (c *Client) MatchDetails(ctx context.Context, matchID int) (*api.MatchDetails, error) {
 	// Check cache first
-	if cached := c.cache.GetDetails(matchID); cached != nil {
+	if cached := c.cache.Details(matchID); cached != nil {
 		return cached, nil
 	}
 
@@ -394,7 +394,7 @@ func (c *Client) PreFetchMatchDetails(ctx context.Context, matchIDs []int, maxPr
 	// Filter out already cached matches
 	var uncachedIDs []int
 	for _, id := range matchIDs {
-		if c.cache.GetDetails(id) == nil {
+		if c.cache.Details(id) == nil {
 			uncachedIDs = append(uncachedIDs, id)
 		}
 	}

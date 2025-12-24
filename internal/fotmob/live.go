@@ -16,7 +16,7 @@ import (
 // Results are cached for 2 minutes to avoid redundant fetches on quick navigation.
 func (c *Client) LiveMatches(ctx context.Context) ([]api.Match, error) {
 	// Check cache first (2-min TTL for quick nav in/out)
-	if cached := c.cache.GetLiveMatches(); cached != nil {
+	if cached := c.cache.LiveMatches(); cached != nil {
 		return cached, nil
 	}
 

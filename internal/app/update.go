@@ -497,7 +497,7 @@ func (m model) handleLiveBatchData(msg liveBatchDataMsg) (tea.Model, tea.Cmd) {
 
 		// Cache the final result
 		if m.fotmobClient != nil && len(m.liveMatchesBuffer) > 0 {
-			m.fotmobClient.GetCache().SetLiveMatches(m.liveMatchesBuffer)
+			m.fotmobClient.Cache().SetLiveMatches(m.liveMatchesBuffer)
 		}
 
 		// Schedule periodic refresh

@@ -60,8 +60,8 @@ func NewResponseCache(config CacheConfig) *ResponseCache {
 	}
 }
 
-// GetMatches retrieves cached matches for a date, returns nil if not cached or expired.
-func (c *ResponseCache) GetMatches(dateKey string) []api.Match {
+// Matches retrieves cached matches for a date, returns nil if not cached or expired.
+func (c *ResponseCache) Matches(dateKey string) []api.Match {
 	c.matchesMu.RLock()
 	defer c.matchesMu.RUnlock()
 
@@ -88,8 +88,8 @@ func (c *ResponseCache) SetMatches(dateKey string, matches []api.Match) {
 	}
 }
 
-// GetDetails retrieves cached match details, returns nil if not cached or expired.
-func (c *ResponseCache) GetDetails(matchID int) *api.MatchDetails {
+// Details retrieves cached match details, returns nil if not cached or expired.
+func (c *ResponseCache) Details(matchID int) *api.MatchDetails {
 	c.detailsMu.RLock()
 	defer c.detailsMu.RUnlock()
 
@@ -124,7 +124,7 @@ func (c *ResponseCache) SetDetails(matchID int, details *api.MatchDetails) {
 }
 
 // GetCachedMatchIDs returns all match IDs currently in the details cache.
-func (c *ResponseCache) GetCachedMatchIDs() []int {
+func (c *ResponseCache) CachedMatchIDs() []int {
 	c.detailsMu.RLock()
 	defer c.detailsMu.RUnlock()
 
@@ -143,7 +143,7 @@ func (c *ResponseCache) ClearDetailsCache() {
 }
 
 // GetLiveMatches retrieves cached live matches, returns nil if not cached or expired.
-func (c *ResponseCache) GetLiveMatches() []api.Match {
+func (c *ResponseCache) LiveMatches() []api.Match {
 	c.liveMu.RLock()
 	defer c.liveMu.RUnlock()
 
