@@ -435,59 +435,49 @@ func renderStatsMatchDetailsPanel(width, height int, details *api.MatchDetails) 
 	}
 
 	// ═══════════════════════════════════════════════
-	// CARDS SUMMARY
+	// CARDS - Detailed list with player, minute, team
 	// ═══════════════════════════════════════════════
-	var homeYellow, awayYellow, homeRed, awayRed int
+	var cardEvents []api.MatchEvent
 	for _, event := range details.Events {
-		isHome := event.Team.ID == details.HomeTeam.ID
-		// Check for card events - FotMob uses lowercase "card" type
 		if event.Type == "card" {
-			if event.EventType != nil {
-				switch *event.EventType {
-				case "yellow", "yellowcard":
-					if isHome {
-						homeYellow++
-					} else {
-						awayYellow++
-					}
-				case "red", "redcard", "secondyellow":
-					if isHome {
-						homeRed++
-					} else {
-						awayRed++
-					}
-				}
-			}
+			cardEvents = append(cardEvents, event)
 		}
 	}
 
-	if homeYellow > 0 || awayYellow > 0 || homeRed > 0 || awayRed > 0 {
+	if len(cardEvents) > 0 {
 		lines = append(lines, "")
 		lines = append(lines, neonHeaderStyle.Render("Cards"))
 
-		// Get short team names (3 chars max)
-		homeShort := homeTeam
-		if len(homeShort) > 3 {
-			homeShort = homeShort[:3]
-		}
-		awayShort := awayTeam
-		if len(awayShort) > 3 {
-			awayShort = awayShort[:3]
-		}
+		// Color styles for card types
+		neonYellow := lipgloss.Color("226") // Bright yellow for yellow cards
+		yellowStyle := lipgloss.NewStyle().Foreground(neonYellow).Bold(true)
+		redStyle := lipgloss.NewStyle().Foreground(neonRed).Bold(true)
 
-		cardLine := fmt.Sprintf("  Yellow: %s %d - %d %s",
-			neonDimStyle.Render(homeShort),
-			homeYellow,
-			awayYellow,
-			neonDimStyle.Render(awayShort))
-		lines = append(lines, neonTeamStyle.Render(cardLine))
-		if homeRed > 0 || awayRed > 0 {
-			redLine := fmt.Sprintf("  Red:    %s %d - %d %s",
-				neonDimStyle.Render(homeShort),
-				homeRed,
-				awayRed,
-				neonDimStyle.Render(awayShort))
-			lines = append(lines, neonLiveStyle.Render(redLine))
+		for _, card := range cardEvents {
+			player := "Unknown"
+			if card.Player != nil {
+				player = *card.Player
+			}
+			teamName := card.Team.ShortName
+			if teamName == "" {
+				teamName = card.Team.Name
+			}
+
+			// Determine card type and apply appropriate color
+			cardSymbol := "▪"
+			cardStyle := yellowStyle
+			if card.EventType != nil && (*card.EventType == "red" || *card.EventType == "redcard" || *card.EventType == "secondyellow") {
+				cardSymbol = "■"
+				cardStyle = redStyle
+			}
+
+			// Format: ▪ 28' PlayerName (Team)
+			cardLine := fmt.Sprintf("  %s %s %s (%s)",
+				cardStyle.Render(cardSymbol),
+				neonScoreStyle.Render(fmt.Sprintf("%d'", card.Minute)),
+				neonValueStyle.Render(player),
+				neonDimStyle.Render(teamName))
+			lines = append(lines, cardLine)
 		}
 	}
 
