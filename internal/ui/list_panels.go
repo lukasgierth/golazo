@@ -31,6 +31,7 @@ func RenderLiveMatchesListPanel(width, height int, listModel list.Model) string 
 	panel := neonPanelStyle.
 		Width(width).
 		Height(height).
+		MaxHeight(height).
 		Render(content)
 
 	return panel
@@ -81,6 +82,7 @@ func RenderStatsListPanel(width, height int, finishedList list.Model, upcomingLi
 		panel := neonPanelStyle.
 			Width(width).
 			Height(height).
+			MaxHeight(height).
 			Render(content)
 		return panel
 	}
@@ -96,6 +98,7 @@ func RenderStatsListPanel(width, height int, finishedList list.Model, upcomingLi
 	panel := neonPanelStyle.
 		Width(width).
 		Height(height).
+		MaxHeight(height).
 		Render(content)
 
 	return panel
@@ -329,6 +332,7 @@ func renderStatsMatchDetailsPanel(width, height int, details *api.MatchDetails) 
 		return neonPanelCyanStyle.
 			Width(width).
 			Height(height).
+			MaxHeight(height).
 			Render(emptyMessage)
 	}
 
@@ -526,6 +530,7 @@ func renderStatsMatchDetailsPanel(width, height int, details *api.MatchDetails) 
 	return neonPanelCyanStyle.
 		Width(width).
 		Height(height).
+		MaxHeight(height).
 		Render(content)
 }
 
