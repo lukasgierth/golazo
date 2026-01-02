@@ -15,8 +15,8 @@ A minimalist terminal user interface (TUI) for following football(i.e, soccer) m
 Golazo was created for those moments when you can't stream or watch matches live. It gives you a handy, non-intrusive, and minimalist way to keep up with your favourite football leagues.
 </div>
 
-> [!TIP]
-> If you like Golazo, give it a star or share it with your friends. That helps others find it and keeps the project going!
+> [!NOTE]
+> If you enjoy Golazo, give it a star and share it with your friends. That helps others find it and keeps the project going!
 
 <div align="center">
   <img src="assets/golazo-demo.gif" alt="Golazo demo" width="800">
