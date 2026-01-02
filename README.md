@@ -10,7 +10,12 @@
 [![GitHub Release](https://img.shields.io/github/v/release/0xjuanma/golazo)](https://github.com/0xjuanma/golazo/releases/latest)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/0xjuanma/golazo/build.yml)](https://github.com/0xjuanma/golazo/actions/workflows/build.yml)
 
-A minimalist terminal user interface (TUI) for following football matches in real-time. Get live match updates, finished match statistics, and minute-by-minute events directly in your terminal.
+A minimalist terminal user interface (TUI) for following football(i.e, soccer) matches in real-time. Get live match updates, finished match statistics, and minute-by-minute events directly in your terminal.
+
+Golazo was created for those moments when you can't stream or watch matches live. It gives you a handy, non-intrusive, and minimalist way to keep up with your favourite football leagues.
+
+> [!NOTE]
+> If you like Golazo, give it a star or share it with your friends. That helps others find it and keeps the project going!
 </div>
 
 <div align="center">
