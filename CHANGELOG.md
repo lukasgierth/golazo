@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- **Duplicate "No items" message** - Resolve double "No items" message when no matches found (Thanks @neomantra)
 
 ## [0.9.0] - 2026-01-01
 
