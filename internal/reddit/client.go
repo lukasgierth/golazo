@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
@@ -24,11 +25,14 @@ type PublicJSONFetcher struct {
 	rateLimiter *rateLimiter
 }
 
-// rateLimiter implements simple rate limiting for Reddit API.
+// rateLimiter implements adaptive rate limiting for Reddit API.
+// Increases delays when CAPTCHA errors are detected.
 type rateLimiter struct {
-	mu          sync.Mutex
-	lastRequest time.Time
-	minInterval time.Duration
+	mu            sync.Mutex
+	lastRequest   time.Time
+	minInterval   time.Duration
+	captchaCount  int
+	lastCaptchaTime time.Time
 }
 
 func newRateLimiter(requestsPerMinute int) *rateLimiter {
@@ -43,10 +47,27 @@ func (r *rateLimiter) wait() {
 	defer r.mu.Unlock()
 
 	elapsed := time.Since(r.lastRequest)
-	if elapsed < r.minInterval {
-		time.Sleep(r.minInterval - elapsed)
+
+	// If we've had CAPTCHA errors recently, be more conservative
+	currentInterval := r.minInterval
+	if r.captchaCount > 0 && time.Since(r.lastCaptchaTime) < 10*time.Minute {
+		// Double the interval after CAPTCHA detections
+		currentInterval = r.minInterval * 2
+	}
+
+	if elapsed < currentInterval {
+		time.Sleep(currentInterval - elapsed)
 	}
 	r.lastRequest = time.Now()
+}
+
+// recordCaptchaError increases the rate limiting after CAPTCHA detection
+func (r *rateLimiter) recordCaptchaError() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.captchaCount++
+	r.lastCaptchaTime = time.Now()
 }
 
 // NewPublicJSONFetcher creates a new fetcher using public Reddit JSON API.
@@ -103,8 +124,19 @@ func (f *PublicJSONFetcher) Search(query string, limit int, matchTime time.Time)
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
+	// Check if Reddit is serving a CAPTCHA or bot detection page
+	bodyStr := string(body)
+	if isCaptchaResponse(bodyStr) {
+		f.rateLimiter.recordCaptchaError()
+		return nil, fmt.Errorf("reddit is blocking requests (CAPTCHA/bot detection)")
+	}
+
 	var searchResp redditSearchResponse
 	if err := json.Unmarshal(body, &searchResp); err != nil {
+		// Check if the response is HTML (likely a CAPTCHA or error page)
+		if strings.Contains(bodyStr, "<html") || strings.Contains(bodyStr, "<!DOCTYPE html") {
+			return nil, fmt.Errorf("reddit returned HTML instead of JSON (likely CAPTCHA or rate limit)")
+		}
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 
@@ -241,8 +273,43 @@ func (c *Client) GoalLinks(goals []GoalInfo) map[GoalLinkKey]*GoalLink {
 	return results
 }
 
-// searchForGoal searches Reddit for a specific goal.
+// searchForGoal searches Reddit for a specific goal with retry logic for CAPTCHA handling.
 func (c *Client) searchForGoal(goal GoalInfo) (*GoalLink, error) {
+	// Implement retry logic with exponential backoff for CAPTCHA issues
+	maxRetries := 3
+	baseDelay := 30 * time.Second // Start with 30 second delay
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 30s, 60s, 120s
+			delay := time.Duration(attempt) * baseDelay
+			time.Sleep(delay)
+		}
+
+		result, err := c.searchForGoalOnce(goal)
+		if err == nil {
+			return result, nil
+		}
+
+		// Check if this is a CAPTCHA/rate limit error that we should retry
+		if strings.Contains(err.Error(), "CAPTCHA") ||
+		   strings.Contains(err.Error(), "blocking requests") ||
+		   strings.Contains(err.Error(), "rate limit") {
+			if attempt < maxRetries-1 {
+				// This was a CAPTCHA error, retry after backoff
+				continue
+			}
+		}
+
+		// For other errors or if we've exhausted retries, return the error
+		return nil, err
+	}
+
+	return nil, nil // No match found after all retries
+}
+
+// searchForGoalOnce performs a single search attempt for a goal.
+func (c *Client) searchForGoalOnce(goal GoalInfo) (*GoalLink, error) {
 	// Strategy 1: Both teams + minute (most specific, try first)
 	query1 := fmt.Sprintf("%s %s %d'", goal.HomeTeam, goal.AwayTeam, goal.Minute)
 	results1, err := c.fetcher.Search(query1, 15, goal.MatchTime)
@@ -315,4 +382,27 @@ func (c *Client) ClearCache() error {
 // Cache returns the underlying cache for direct access if needed.
 func (c *Client) Cache() *GoalLinkCache {
 	return c.cache
+}
+
+// isCaptchaResponse detects if Reddit is serving a CAPTCHA or bot detection page.
+// This happens when Reddit blocks automated requests.
+func isCaptchaResponse(body string) bool {
+	captchaIndicators := []string{
+		"prove your humanity",
+		"captcha",
+		"robot",
+		"automated",
+		"blocked",
+		"rate limit",
+		"too many requests",
+	}
+
+	bodyLower := strings.ToLower(body)
+	for _, indicator := range captchaIndicators {
+		if strings.Contains(bodyLower, indicator) {
+			return true
+		}
+	}
+
+	return false
 }
