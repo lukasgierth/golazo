@@ -28,15 +28,11 @@ type PublicJSONFetcher struct {
 	rateLimiter *rateLimiter
 }
 
-// rateLimiter implements adaptive rate limiting for Reddit API.
-// Increases delays when CAPTCHA errors are detected.
+// rateLimiter implements simple rate limiting for Reddit API.
 type rateLimiter struct {
-	mu              sync.Mutex
-	lastRequest     time.Time
-	minInterval     time.Duration
-	captchaCount    int
-	lastCaptchaTime time.Time
-	userAgentIndex  int // Track which user agent to use next
+	mu          sync.Mutex
+	lastRequest time.Time
+	minInterval time.Duration
 }
 
 func newRateLimiter(requestsPerMinute int) *rateLimiter {
@@ -51,38 +47,12 @@ func (r *rateLimiter) wait() {
 	defer r.mu.Unlock()
 
 	elapsed := time.Since(r.lastRequest)
-
-	// If we've had CAPTCHA errors recently, be more conservative
-	currentInterval := r.minInterval
-	if r.captchaCount > 0 && time.Since(r.lastCaptchaTime) < 10*time.Minute {
-		// Double the interval after CAPTCHA detections
-		currentInterval = r.minInterval * 2
-	}
-
-	if elapsed < currentInterval {
-		time.Sleep(currentInterval - elapsed)
+	if elapsed < r.minInterval {
+		time.Sleep(r.minInterval - elapsed)
 	}
 	r.lastRequest = time.Now()
 }
 
-// recordCaptchaError increases the rate limiting after CAPTCHA detection
-func (r *rateLimiter) recordCaptchaError() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.captchaCount++
-	r.lastCaptchaTime = time.Now()
-}
-
-// getNextUserAgent returns the next user agent in rotation
-func (r *rateLimiter) getNextUserAgent() string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	agent := userAgents[r.userAgentIndex]
-	r.userAgentIndex = (r.userAgentIndex + 1) % len(userAgents)
-	return agent
-}
 
 // Simple user agent exactly like main branch
 var userAgents = []string{
@@ -96,8 +66,8 @@ func NewPublicJSONFetcher() *PublicJSONFetcher {
 			Timeout: 10 * time.Second,
 		},
 		// Reddit requires a descriptive User-Agent
-		userAgent:   userAgents[0],     // Start with first agent
-		rateLimiter: newRateLimiter(5), // Reasonable: 5 requests per minute
+		userAgent:   "golazo:v1.0.0 (by /u/golazo_app)",
+		rateLimiter: newRateLimiter(10), // 10 requests per minute for public API
 	}
 }
 
@@ -125,9 +95,7 @@ func (f *PublicJSONFetcher) Search(query string, limit int, matchTime time.Time)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-
-	// Simple user agent exactly like main branch
-	req.Header.Set("User-Agent", f.rateLimiter.getNextUserAgent())
+	req.Header.Set("User-Agent", f.userAgent)
 
 	resp, err := f.httpClient.Do(req)
 	if err != nil {
@@ -145,19 +113,8 @@ func (f *PublicJSONFetcher) Search(query string, limit int, matchTime time.Time)
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
-	// Check if Reddit is serving a CAPTCHA or bot detection page
-	bodyStr := string(body)
-	if isCaptchaResponse(bodyStr) {
-		f.rateLimiter.recordCaptchaError()
-		return nil, fmt.Errorf("reddit is blocking requests (CAPTCHA/bot detection)")
-	}
-
 	var searchResp redditSearchResponse
 	if err := json.Unmarshal(body, &searchResp); err != nil {
-		// Check if the response is HTML (likely a CAPTCHA or error page)
-		if strings.Contains(bodyStr, "<html") || strings.Contains(bodyStr, "<!DOCTYPE html") {
-			return nil, fmt.Errorf("reddit returned HTML instead of JSON (likely CAPTCHA or rate limit)")
-		}
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 
