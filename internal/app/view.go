@@ -45,6 +45,8 @@ func (m model) View() string {
 			m.statsTotalDays,
 			m.buildGoalLinksMap(),
 			m.getStatusBannerType(),
+			&m.statsDetailsViewport,
+			m.statsRightPanelFocused,
 		)
 
 	case viewSettings:

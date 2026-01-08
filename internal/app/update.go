@@ -383,9 +383,46 @@ func (m model) handleStatsSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Check if list is in filtering mode - if so, let list handle ALL keys
 	isFiltering := m.statsMatchesList.FilterState() == list.Filtering
 
+	// Handle keys based on focus state
+	if m.statsRightPanelFocused && m.matchDetails != nil && m.statsDetailsViewport.Height > 0 {
+		// Right panel focused - handle scrolling keys
+		switch msg.String() {
+		case "up", "k":
+			// Scroll up by 1 line for smooth scrolling
+			if m.matchDetails != nil && m.statsDetailsViewport.Height > 0 {
+				m.debugLog(fmt.Sprintf("Scrolling UP: viewport height=%d, yOffset=%d",
+					m.statsDetailsViewport.Height, m.statsDetailsViewport.YOffset))
+				m.statsDetailsViewport.LineUp(1)
+				m.debugLog(fmt.Sprintf("After scroll UP: yOffset=%d", m.statsDetailsViewport.YOffset))
+			} else {
+				m.debugLog(fmt.Sprintf("Cannot scroll UP: matchDetails=%v, viewportHeight=%d", m.matchDetails != nil, m.statsDetailsViewport.Height))
+			}
+			return m, nil
+		case "down", "j":
+			// Scroll down by 1 line for smooth scrolling
+			if m.matchDetails != nil && m.statsDetailsViewport.Height > 0 {
+				m.debugLog(fmt.Sprintf("Scrolling DOWN: viewport height=%d, yOffset=%d",
+					m.statsDetailsViewport.Height, m.statsDetailsViewport.YOffset))
+				m.statsDetailsViewport.LineDown(1)
+				m.debugLog(fmt.Sprintf("After scroll DOWN: yOffset=%d", m.statsDetailsViewport.YOffset))
+			} else {
+				m.debugLog(fmt.Sprintf("Cannot scroll DOWN: matchDetails=%v, viewportHeight=%d", m.matchDetails != nil, m.statsDetailsViewport.Height))
+			}
+			return m, nil
+		case "tab":
+			// Tab toggles focus back to left panel
+			m.statsRightPanelFocused = false
+			return m, nil
+		}
+	}
+
 	// Only handle date range navigation when NOT filtering
 	if !isFiltering {
 		if msg.String() == "h" || msg.String() == "left" || msg.String() == "l" || msg.String() == "right" {
+			return m.handleStatsViewKeys(msg)
+		}
+		// Handle tab toggle when not filtering
+		if msg.String() == "tab" {
 			return m.handleStatsViewKeys(msg)
 		}
 	}
@@ -398,7 +435,7 @@ func (m model) handleStatsSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Handle list navigation
+	// Handle list navigation (only when left panel is focused)
 	var listCmd tea.Cmd
 	m.statsMatchesList, listCmd = m.statsMatchesList.Update(msg)
 

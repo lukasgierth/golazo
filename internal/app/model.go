@@ -16,6 +16,7 @@ import (
 	"github.com/0xjuanma/golazo/internal/ui"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -70,9 +71,11 @@ type model struct {
 	pollingSpinner   *ui.RandomCharSpinner // Small spinner for polling indicator
 
 	// List components
-	liveMatchesList     list.Model
-	statsMatchesList    list.Model
-	upcomingMatchesList list.Model
+	liveMatchesList        list.Model
+	statsMatchesList       list.Model
+	upcomingMatchesList    list.Model
+	statsDetailsViewport   viewport.Model // Scrollable viewport for match details in stats view
+	statsRightPanelFocused bool           // Whether right panel is focused for scrolling
 
 	// Loading states
 	loading          bool
@@ -150,6 +153,10 @@ func New(useMockData bool, debugMode bool, isDevBuild bool, newVersionAvailable 
 	statsList.FilterInput.PromptStyle = filterPromptStyle
 	statsList.FilterInput.Cursor.Style = filterCursorStyle
 
+	// Initialize viewport for scrollable match details in stats view
+	statsDetailsViewport := viewport.New(80, 20) // Will be resized dynamically
+	statsDetailsViewport.MouseWheelEnabled = true
+
 	upcomingList := list.New([]list.Item{}, delegate, 0, 0)
 	upcomingList.SetShowTitle(false)
 	upcomingList.SetShowStatusBar(true)
@@ -182,26 +189,28 @@ func New(useMockData bool, debugMode bool, isDevBuild bool, newVersionAvailable 
 	}
 
 	return model{
-		currentView:         viewMain,
-		matchDetailsCache:   make(map[int]*api.MatchDetails),
-		useMockData:         useMockData,
-		debugMode:           debugMode,
-		isDevBuild:          isDevBuild,
-		newVersionAvailable: newVersionAvailable,
-		fotmobClient:        fotmob.NewClient(),
-		parser:              fotmob.NewLiveUpdateParser(),
-		redditClient:        redditClient,
-		goalLinks:           make(map[reddit.GoalLinkKey]*reddit.GoalLink),
-		notifier:            notify.NewDesktopNotifier(),
-		spinner:             s,
-		randomSpinner:       randomSpinner,
-		statsViewSpinner:    statsViewSpinner,
-		pollingSpinner:      pollingSpinner,
-		liveMatchesList:     liveList,
-		statsMatchesList:    statsList,
-		upcomingMatchesList: upcomingList,
-		statsDateRange:      1,
-		pendingSelection:    -1, // No pending selection
+		currentView:            viewMain,
+		matchDetailsCache:      make(map[int]*api.MatchDetails),
+		useMockData:            useMockData,
+		debugMode:              debugMode,
+		isDevBuild:             isDevBuild,
+		newVersionAvailable:    newVersionAvailable,
+		fotmobClient:           fotmob.NewClient(),
+		parser:                 fotmob.NewLiveUpdateParser(),
+		redditClient:           redditClient,
+		goalLinks:              make(map[reddit.GoalLinkKey]*reddit.GoalLink),
+		notifier:               notify.NewDesktopNotifier(),
+		spinner:                s,
+		randomSpinner:          randomSpinner,
+		statsViewSpinner:       statsViewSpinner,
+		pollingSpinner:         pollingSpinner,
+		liveMatchesList:        liveList,
+		statsMatchesList:       statsList,
+		upcomingMatchesList:    upcomingList,
+		statsDetailsViewport:   statsDetailsViewport,
+		statsRightPanelFocused: false, // Start with left panel focused
+		statsDateRange:         1,
+		pendingSelection:       -1, // No pending selection
 	}
 }
 
