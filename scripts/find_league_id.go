@@ -2,11 +2,12 @@
 //
 // Usage:
 //   go run scripts/find_league_id.go <search_term>
+//   go run scripts/find_league_id.go --south-america  (searches for first division leagues in Peru, Ecuador, Chile, Uruguay)
 //
 // Examples:
 //   go run scripts/find_league_id.go "Premier League"
 //   go run scripts/find_league_id.go Japan
-//   go run scripts/find_league_id.go Denmark
+//   go run scripts/find_league_id.go --south-america
 
 package main
 
@@ -23,8 +24,15 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run scripts/find_league_id.go <search_term>")
-		fmt.Println("Example: go run scripts/find_league_id.go Japan")
+		fmt.Println("       go run scripts/find_league_id.go --south-america")
+		fmt.Println("Example: go run scripts/find_league_id.go \"Premier League\"")
+		fmt.Println("         go run scripts/find_league_id.go --south-america")
 		os.Exit(1)
+	}
+
+	if os.Args[1] == "--south-america" {
+		searchSouthAmericaLeagues()
+		return
 	}
 
 	term := strings.Join(os.Args[1:], " ")
@@ -90,6 +98,53 @@ func search(term string) []league {
 		}
 	}
 	return results
+}
+
+func searchSouthAmericaLeagues() {
+	countries := []string{"Brazil", "Argentina", "Uruguay", "Colombia", "Chile", "Peru", "Ecuador"}
+
+	fmt.Printf("%-6s %-35s %s\n", "ID", "Name", "Country")
+	fmt.Println(strings.Repeat("-", 55))
+
+	for _, country := range countries {
+		results := search(country + " primera division")
+
+		// Also try some alternative search terms
+		if len(results) == 0 {
+			results = search(country + " primera")
+		}
+		if len(results) == 0 {
+			results = search(country + " liga 1")
+		}
+
+		// Filter for leagues that seem to be first division
+		var firstDivisionLeagues []league
+		for _, r := range results {
+			name := strings.ToLower(r.Name)
+			if strings.Contains(name, "primera") ||
+				strings.Contains(name, "liga 1") ||
+				strings.Contains(name, "serie a") ||
+				strings.Contains(name, "division") ||
+				(strings.Contains(name, "liga") && !strings.Contains(name, "liga 2") && !strings.Contains(name, "liga 3")) {
+				firstDivisionLeagues = append(firstDivisionLeagues, r)
+			}
+		}
+
+		// If we found potential first division leagues, show the first one
+		if len(firstDivisionLeagues) > 0 {
+			r := firstDivisionLeagues[0]
+			fmt.Printf("%-6d %-35s %s\n", r.ID, truncate(r.Name, 35), r.Country)
+		} else if len(results) > 0 {
+			// Fallback: show first result
+			r := results[0]
+			fmt.Printf("%-6d %-35s %s\n", r.ID, truncate(r.Name, 35), r.Country)
+		} else {
+			fmt.Printf("N/A    %-35s No league found\n", country)
+		}
+
+		// Small delay to be respectful to the server
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 func truncate(s string, max int) string {
