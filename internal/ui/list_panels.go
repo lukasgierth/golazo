@@ -931,14 +931,6 @@ func formatNumber(n int) string {
 	return result
 }
 
-// min returns the smaller of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // truncateToHeight truncates content to fit within maxLines.
 // This is used to truncate inner content before applying bordered styles,
 // ensuring borders are always rendered completely.
