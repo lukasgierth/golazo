@@ -205,15 +205,16 @@ func renderMatchDetailsPanelFull(width, height int, details *api.MatchDetails, l
 	// 1. Status/Minute and League info (centered)
 	infoStyle := lipgloss.NewStyle().Foreground(neonDim)
 	var statusText string
-	if details.Status == api.MatchStatusLive {
+	switch details.Status {
+	case api.MatchStatusLive:
 		liveTime := constants.StatusLive
 		if details.LiveTime != nil {
 			liveTime = *details.LiveTime
 		}
 		statusText = lipgloss.NewStyle().Foreground(neonRed).Bold(true).Render(liveTime)
-	} else if details.Status == api.MatchStatusFinished {
+	case api.MatchStatusFinished:
 		statusText = lipgloss.NewStyle().Foreground(neonCyan).Render(constants.StatusFinished)
-	} else {
+	default:
 		statusText = infoStyle.Render(constants.StatusNotStartedShort)
 	}
 
@@ -375,10 +376,10 @@ func renderMatchDetailsPanelFull(width, height int, details *api.MatchDetails, l
 				cardContent := buildEventContent(playerDetails, "", cardSymbol, cardStyle.Render("CARD"), isHome)
 
 				minuteStr := card.DisplayMinute
-			if minuteStr == "" {
-				minuteStr = fmt.Sprintf("%d'", card.Minute) // Fallback
-			}
-			cardLine := renderCenterAlignedEvent(minuteStr, cardContent, isHome, contentWidth)
+				if minuteStr == "" {
+					minuteStr = fmt.Sprintf("%d'", card.Minute) // Fallback
+				}
+				cardLine := renderCenterAlignedEvent(minuteStr, cardContent, isHome, contentWidth)
 				content.WriteString(cardLine)
 				content.WriteString("\n")
 			}
