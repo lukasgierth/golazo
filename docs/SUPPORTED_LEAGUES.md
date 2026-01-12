@@ -7,7 +7,7 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 ## Europe — Top Leagues
 
 | | League |
-|---|------|
+|---|--------|
 | 🇩🇪 | Bundesliga |
 | 🇩🇪 | Frauen-Bundesliga |
 | 🇪🇸 | La Liga |
@@ -22,7 +22,7 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 ## Europe — Other Leagues
 
 | | League |
-|---|------|
+|---|--------|
 | 🇸🇪 | Allsvenskan |
 | 🇦🇹 | Austrian Bundesliga |
 | 🇧🇪 | Belgian Pro League |
@@ -48,7 +48,7 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 ## European Competitions
 
 | | Competition |
-|---|-----------|
+|---|-------------|
 | 🏆 | UEFA Champions League |
 | 🏆 | UEFA Conference League |
 | 🇪🇺 | UEFA Euro |
@@ -59,7 +59,7 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 ## Domestic Cups
 
 | | Cup |
-|---|---|
+|---|-----|
 | 🇪🇸 | Copa del Rey |
 | 🇮🇹 | Coppa Italia |
 | 🇫🇷 | Coupe de France |
@@ -92,7 +92,7 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 ## North America
 
 | | League |
-|---|-------|
+|---|--------|
 | 🇲🇽 | Liga MX |
 | 🇺🇸 | MLS |
 | 🇺🇸 | NWSL |
@@ -100,13 +100,13 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 ## Middle East
 
 | | League |
-|---|-------|
+|---|--------|
 | 🇸🇦 | Saudi Pro League |
 
 ## Asia
 
 | | League |
-|---|-------|
+|---|--------|
 | 🇨🇳 | Chinese Super League |
 | 🇮🇳 | Indian Super League |
 | 🇯🇵 | J. League |
@@ -116,13 +116,13 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 ## Oceania
 
 | | League |
-|---|-------|
+|---|--------|
 | 🇦🇺 | A-League |
 
 ## Africa
 
 | | League |
-|---|-------|
+|---|--------|
 | 🇲🇦 | Botola Pro |
 | 🇪🇬 | Egyptian Premier League |
 | 🇿🇦 | Premier Soccer League |
@@ -130,7 +130,7 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 ## International
 
 | | Competition |
-|---|------------|
+|---|-------------|
 | 🌍 | Africa Cup of Nations |
 | 🌍 | International Friendlies |
 | ⚽ | Club Friendlies |
