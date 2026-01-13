@@ -335,6 +335,37 @@ func renderMatchDetailsPanelFull(width, height int, details *api.MatchDetails, l
 			content.WriteString("\n")
 		}
 
+		// Highlights section - show official highlight video if available
+		if details.Highlight != nil && details.Highlight.URL != "" {
+			highlightsTitle := lipgloss.NewStyle().
+				Foreground(neonCyan).
+				Bold(true).
+				PaddingTop(0).
+				BorderBottom(true).
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderForeground(neonDarkDim).
+				Width(width - 6).
+				Render("Highlights")
+			content.WriteString(highlightsTitle)
+			content.WriteString("\n")
+
+			// Display highlight video link with play button emoji
+			highlightText := "▶️  Official Highlights Available"
+			if details.Highlight.Source != "" {
+				highlightText += fmt.Sprintf(" (%s)", details.Highlight.Source)
+			}
+
+			highlightStyle := lipgloss.NewStyle().
+				Foreground(neonWhite).
+				Bold(true).
+				Italic(true).
+				Width(contentWidth).
+				Align(lipgloss.Center)
+
+			content.WriteString(highlightStyle.Render(highlightText))
+			content.WriteString("\n\n")
+		}
+
 		// Cards section with neon styling - detailed list with player, minute, team
 		var cardEvents []api.MatchEvent
 		for _, event := range details.Events {
