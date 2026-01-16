@@ -26,7 +26,7 @@ Golazo was created for those moments when you can't stream or watch matches live
 
 - **Live Match Tracking**: Timeline & Real-time updates for goals, cards, and substitutions with automatic polling
 - **Match Statistics**: Detailed stats including possession, shots, and passes
-- **Goal Notifications & Replay Links**:  Desktop notifications & clickable links to goal replays
+- **Official Highlights, Goal Notifications & Replay Links**:  Desktop notifications & clickable links for goal replays and official highlights
 - **Finished Matches**: View results from today, last 3 days, or last 5 days
 - **50+ Leagues**: Support for major leagues across Europe, Americas, Asia, and more. Select your favorite leagues in Settings
 
