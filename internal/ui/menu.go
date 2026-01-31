@@ -11,6 +11,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// logoWidth is the standard width for the logo container.
+const logoWidth = 80
+
 var (
 	// Menu styles
 	menuItemStyle = lipgloss.NewStyle().
@@ -41,8 +44,8 @@ var (
 // randomSpinner is the random character spinner for main view.
 // loading indicates if the spinner should be shown.
 // bannerType determines what status banner (if any) to display at the top.
-// appVersion is the current application version string for display.
-func RenderMainMenu(width, height, selected int, sp spinner.Model, randomSpinner *RandomCharSpinner, loading bool, bannerType constants.StatusBannerType, appVersion string) string {
+// animatedLogo is the animated logo instance for the main view.
+func RenderMainMenu(width, height, selected int, sp spinner.Model, randomSpinner *RandomCharSpinner, loading bool, bannerType constants.StatusBannerType, animatedLogo *logo.AnimatedLogo) string {
 	menuItems := []string{
 		constants.MenuStats,
 		constants.MenuLiveMatches,
@@ -60,11 +63,8 @@ func RenderMainMenu(width, height, selected int, sp spinner.Model, randomSpinner
 
 	menuContent := strings.Join(items, "\n")
 
-	// Render stylized logo with gradient (wide mode & centered)
-	const logoWidth = 80
-	logoOpts := logo.DefaultOpts()
-	logoOpts.Width = logoWidth
-	logoContent := logo.Render(appVersion, false, logoOpts)
+	// Get logo content from animated logo (handles animation state internally)
+	logoContent := animatedLogo.View()
 
 	// Place logo in centered container
 	title := lipgloss.NewStyle().

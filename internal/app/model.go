@@ -14,6 +14,7 @@ import (
 	"github.com/0xjuanma/golazo/internal/notify"
 	"github.com/0xjuanma/golazo/internal/reddit"
 	"github.com/0xjuanma/golazo/internal/ui"
+	"github.com/0xjuanma/golazo/internal/ui/logo"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -111,6 +112,9 @@ type model struct {
 
 	// Notifications
 	notifier *notify.DesktopNotifier
+
+	// Logo animation (main view only)
+	animatedLogo *logo.AnimatedLogo
 }
 
 // New creates a new application model with default values.
@@ -200,6 +204,9 @@ func New(useMockData bool, debugMode bool, isDevBuild bool, newVersionAvailable 
 		redditClient, _ = reddit.NewClient()
 	}
 
+	// Initialize animated logo for main view (600ms duration, play once)
+	animatedLogo := logo.NewAnimatedLogo(appVersion, false, logo.DefaultOpts(), 600, 1)
+
 	return model{
 		currentView:            viewMain,
 		matchDetailsCache:      make(map[int]*api.MatchDetails),
@@ -221,11 +228,12 @@ func New(useMockData bool, debugMode bool, isDevBuild bool, newVersionAvailable 
 		statsMatchesList:       statsList,
 		upcomingMatchesList:    upcomingList,
 		statsDetailsViewport:   statsDetailsViewport,
-		statsRightPanelFocused: false, // Start with left panel focused
-		statsScrollOffset:      0,     // Start at top
+		statsRightPanelFocused: false,                 // Start with left panel focused
+		statsScrollOffset:      0,                     // Start at top
 		statsDateRange:         1,
 		pendingSelection:       -1,                    // No pending selection
 		dialogOverlay:          ui.NewDialogOverlay(), // Initialize dialog overlay
+		animatedLogo:           animatedLogo,          // Initialize animated logo
 	}
 }
 
