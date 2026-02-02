@@ -11,6 +11,11 @@
 [![GitHub Release](https://img.shields.io/github/v/release/0xjuanma/golazo)](https://github.com/0xjuanma/golazo/releases/latest)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/0xjuanma/golazo/build.yml)](https://github.com/0xjuanma/golazo/actions/workflows/build.yml)
 
+[![GitHub Downloads](https://img.shields.io/github/downloads/0xjuanma/golazo/total)](https://github.com/0xjuanma/golazo/releases)
+![macOS](https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)
+![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)
+
 A minimalist terminal user interface (TUI) for following football (soccer) matches in real-time. Get live match updates, finished match statistics, and minute-by-minute events directly in your terminal.
 
 Golazo was created for those moments when you can't stream or watch matches live. It gives you a handy, non-intrusive, and minimalist way to keep up with your favourite football leagues.
@@ -42,12 +47,7 @@ Golazo was created for those moments when you can't stream or watch matches live
 
 ## Installation & Update
 
-> [!IMPORTANT]
-> As of v0.6.0, you can update golazo to the latest version by running:
-> ```bash
-> golazo --update
-> ```
-> The command automatically detects whether you installed via Homebrew or the install script.
+**Self-update:** Run `golazo --update` anytime to get the latest version.
 
 ### Homebrew
 
@@ -87,7 +87,7 @@ Run the application:
 golazo
 ```
 
-**Navigation:** `↑`/`↓` or `j`/`k` to move, `Enter` to select, `/` to filter, `Esc` to go back, `q` to quit.
+**Navigation:** `↑`/`↓` or `j`/`k` to move, `Enter` to select, `/` to filter, `Tab` to focus view, `Esc` to go back, `q` to quit.
 
 ## Docs
 
@@ -96,6 +96,10 @@ golazo
 
 ---
 
-Powered by [Cobra](https://github.com/spf13/cobra) & the glamorous [Charmbracelet](https://github.com/charmbracelet).
+<div align="center">
 
-**Author:** [@0xjuanma](https://github.com/0xjuanma)
+**Built with** [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) & [Bubbles](https://github.com/charmbracelet/bubbles) by [Charm](https://charm.sh)
+
+Author: [@0xjuanma](https://github.com/0xjuanma)
+
+</div>
