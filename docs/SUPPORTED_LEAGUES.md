@@ -78,6 +78,11 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 | 🇦🇷 | Liga Profesional |
 | 🇧🇷 | Brasileirão Série A |
 | 🇧🇷 | Brasileirão Série B |
+| 🇧🇷 | Copa do Brasil |
+| 🇧🇷 | Supercopa do Brasil |
+| 🇧🇷 | Campeonato Paulista |
+| 🇧🇷 | Campeonato Carioca |
+| 🇧🇷 | Campeonato Mineiro |
 | 🇧🇷 | Campeonato Gaúcho |
 | 🇨🇱 | Primera Division |
 | 🇨🇴 | Copa Colombia |
@@ -89,6 +94,7 @@ Golazo supports **60+ leagues and competitions**. Customize your selection in Se
 | 🏆 | Copa America |
 | 🏆 | Copa Libertadores |
 | 🏆 | Copa Sudamericana |
+| 🏆 | Recopa Sudamericana |
 
 ## North America
 
