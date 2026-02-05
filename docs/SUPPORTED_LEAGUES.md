@@ -1,6 +1,6 @@
 # Supported Leagues
 
-Golazo supports **68+ leagues and competitions**. Customize your selection in Settings.
+Golazo supports **65+ leagues and competitions**. Customize your selection in Settings.
 
 > **Missing your favourite league?** [Create an issue](https://github.com/0xjuanma/golazo/issues/new) and we'll add it!
 
@@ -17,6 +17,7 @@ Golazo supports **68+ leagues and competitions**. Customize your selection in Se
 | 🇫🇷 | Première Ligue Féminine |
 | 🏴󠁧󠁢󠁥󠁮󠁧󠁿 | Premier League |
 | 🇮🇹 | Serie A |
+| 🇮🇹 | Serie B |
 | 🇮🇹 | Serie A Femminile |
 | 🏴󠁧󠁢󠁥󠁮󠁧󠁿 | Women's Super League |
 
