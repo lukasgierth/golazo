@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Goal Replay Links** - Added a new Reddit search strategy using short/alternative team names, improving goal link discovery when standard queries miss
 
 ### Fixed
+- **Stats View Focus** - Fixed focus state persisting when navigating away from stats view, ensuring fresh state on re-entry
 
 ## [0.20.0] - 2026-02-05
 
