@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- **Half-Time Score** - Fixed HT score being overwritten with the final score when a match finishes
 
 ## [0.21.0] - 2026-02-07
 
